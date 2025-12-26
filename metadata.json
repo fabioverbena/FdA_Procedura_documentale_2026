@@ -1,0 +1,8 @@
+{
+  "name": "FdA Procedura Documentale 2026",
+  "description": "Sales order management system with Google Drive/Sheets integration and Gemini AI for professional document and email workflows.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
