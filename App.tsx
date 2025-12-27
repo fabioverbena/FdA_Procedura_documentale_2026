@@ -1,7 +1,7 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Order, OrderStatus, DashboardStats, AppConfig } from './types';
 import { getOrders, saveOrder, deleteOrder, updateOrderStatus, getConfig, seedTestData, generateSafeId } from './services/googleService';
+import { handleOAuthCallback, isAuthenticated } from './services/googleAuth';
 import Navbar from './components/Navbar';
 import Dashboard from './components/Dashboard';
 import OrderForm from './components/OrderForm';
@@ -24,11 +24,39 @@ const App: React.FC = () => {
   const [pendingEmailOrder, setPendingEmailOrder] = useState<{order: Order, forcedDoc?: 'contratto' | 'manuale' | 'garanzia'} | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
+
+  // Gestisce il callback OAuth al caricamento dell'app
+  useEffect(() => {
+    const urlHasToken = window.location.hash.includes('access_token');
+    
+    if (urlHasToken) {
+      const success = handleOAuthCallback();
+      if (success) {
+        showToast('Autenticazione Google completata!', 'success');
+        setTimeout(() => setIsSettingsOpen(true), 500);
+      } else {
+        showToast('Errore durante l\'autenticazione', 'error');
+      }
+    }
+    
+    // Carica ordini all'avvio
+    loadOrders();
+  }, []);
 
   useEffect(() => {
-    setOrders(getOrders());
+    loadOrders();
   }, [activeTab]);
+
+  const loadOrders = async () => {
+    try {
+      const data = await getOrders();
+      setOrders(data);
+    } catch (error) {
+      console.error('Errore caricamento ordini:', error);
+      showToast('Errore caricamento dati', 'error');
+    }
+  };
 
   const stats: DashboardStats = useMemo(() => {
     return {
@@ -42,14 +70,12 @@ const App: React.FC = () => {
   const filteredOrders = useMemo(() => {
     let result = [...orders];
     
-    // Filtri di stato dalla Dashboard
     if (currentFilter === 'IN_CORSO_ONLY') {
       result = result.filter(o => o.status === OrderStatus.IN_CORSO);
     } else if (currentFilter && currentFilter !== 'TOTAL') {
       result = result.filter(o => o.status === currentFilter);
     }
     
-    // Ricerca globale (Azienda, PIVA, Modello, Matricola, Tipo Contratto)
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase().trim();
       result = result.filter(o => 
@@ -63,7 +89,7 @@ const App: React.FC = () => {
     return result.sort((a, b) => new Date(b.dataInserimento).getTime() - new Date(a.dataInserimento).getTime());
   }, [orders, searchTerm, currentFilter]);
 
-  const showToast = (message: string, type: 'success' | 'info' = 'success') => {
+  const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
@@ -74,60 +100,88 @@ const App: React.FC = () => {
   };
 
   const handleCreateOrUpdate = async (data: Partial<Order>, action: 'save' | 'print' | 'email') => {
-    setIsLoading(true);
-    const orderData = {
-      ...data,
-      id: data.id || generateSafeId(),
-      status: data.status || OrderStatus.IN_CORSO,
-      workflow: data.workflow || {
-        contrattoInviato: action === 'email',
-        contrattoFirmato: false,
-        manualeInviato: false,
-        manualeFirmato: false,
-        garanziaRilasciata: false
-      }
-    } as Order;
+    if ((action === 'email' || action === 'print') && !isAuthenticated()) {
+      showToast('Effettua il login Google per usare questa funzione', 'error');
+      setIsSettingsOpen(true);
+      return;
+    }
 
-    await saveOrder(orderData);
-    const updated = getOrders();
-    setOrders(updated);
-    setEditingOrder(null);
-    setActiveTab('database');
-    
-    showToast(`Ordine ${orderData.nomeAzienda} salvato.`);
-    
-    if (action === 'email') setPendingEmailOrder({ order: orderData, forcedDoc: 'contratto' });
-    else if (action === 'print') setPrintingOrder(orderData);
-    setIsLoading(false);
+    setIsLoading(true);
+    try {
+      const orderData = {
+        ...data,
+        id: data.id || generateSafeId(),
+        status: data.status || OrderStatus.IN_CORSO,
+        workflow: data.workflow || {
+          contrattoInviato: action === 'email',
+          contrattoFirmato: false,
+          manualeInviato: false,
+          manualeFirmato: false,
+          garanziaRilasciata: false
+        }
+      } as Order;
+
+      await saveOrder(orderData);
+      await loadOrders();
+      setEditingOrder(null);
+      setActiveTab('database');
+      
+      showToast(`Ordine ${orderData.nomeAzienda} salvato.`);
+      
+      if (action === 'email') setPendingEmailOrder({ order: orderData, forcedDoc: 'contratto' });
+      else if (action === 'print') setPrintingOrder(orderData);
+    } catch (error) {
+      console.error('Errore salvataggio ordine:', error);
+      showToast('Errore salvataggio ordine', 'error');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleToggleManualStatus = (id: string, current: OrderStatus) => {
+  const handleToggleManualStatus = async (id: string, current: OrderStatus) => {
     const nextStatus = current === OrderStatus.SOSPESO ? OrderStatus.IN_CORSO : OrderStatus.SOSPESO;
-    updateOrderStatus(id, nextStatus);
-    const updated = getOrders();
-    setOrders(updated);
-    
-    showToast(nextStatus === OrderStatus.SOSPESO ? "Ordine SOSPESO" : "Iter RIPRESO", 'info');
+    try {
+      await updateOrderStatus(id, nextStatus);
+      await loadOrders();
+      
+      showToast(nextStatus === OrderStatus.SOSPESO ? "Ordine SOSPESO" : "Iter RIPRESO", 'info');
 
-    const updatedOrder = updated.find(o => o.id === id);
-    if (viewingWorkflow && updatedOrder) setViewingWorkflow(updatedOrder);
+      const updated = await getOrders();
+      const updatedOrder = updated.find(o => o.id === id);
+      if (viewingWorkflow && updatedOrder) setViewingWorkflow(updatedOrder);
+    } catch (error) {
+      console.error('Errore cambio stato:', error);
+      showToast('Errore cambio stato', 'error');
+    }
   };
 
   const handleUpdateWorkflow = async (id: string, workflow: Order['workflow']) => {
     const order = orders.find(o => o.id === id);
     if (order) {
-      const isFinishing = workflow.garanziaRilasciata && order.status !== OrderStatus.CONCLUSO;
-      const newStatus = workflow.garanziaRilasciata ? OrderStatus.CONCLUSO : order.status;
-      const updatedOrder = { ...order, workflow, status: newStatus };
-      await saveOrder(updatedOrder);
-      const updated = getOrders();
-      setOrders(updated);
-      setViewingWorkflow(updated.find(o => o.id === id) || null);
-      showToast(isFinishing ? "Iter CONCLUSO con successo!" : "Avanzamento registrato");
+      try {
+        const isFinishing = workflow.garanziaRilasciata && order.status !== OrderStatus.CONCLUSO;
+        const newStatus = workflow.garanziaRilasciata ? OrderStatus.CONCLUSO : order.status;
+        const updatedOrder = { ...order, workflow, status: newStatus };
+        
+        await saveOrder(updatedOrder);
+        await loadOrders();
+        
+        const updated = await getOrders();
+        setViewingWorkflow(updated.find(o => o.id === id) || null);
+        showToast(isFinishing ? "Iter CONCLUSO con successo!" : "Avanzamento registrato");
+      } catch (error) {
+        console.error('Errore aggiornamento workflow:', error);
+        showToast('Errore aggiornamento workflow', 'error');
+      }
     }
   };
 
   const handleContinueWorkflow = (order: Order, forcedDocType?: 'contratto' | 'manuale' | 'garanzia') => {
+    if (!isAuthenticated()) {
+      showToast('Effettua il login Google per continuare', 'error');
+      setIsSettingsOpen(true);
+      return;
+    }
     setViewingWorkflow(null);
     setPendingEmailOrder({ order, forcedDoc: forcedDocType });
   };
@@ -137,81 +191,172 @@ const App: React.FC = () => {
     showToast("Configurazione salvata");
   };
 
-  const handleSeedData = () => {
+  const handleSeedData = async () => {
     setIsLoading(true);
-    setTimeout(() => {
-      const newOrders = seedTestData();
+    try {
+      const newOrders = await seedTestData();
       setOrders(newOrders);
-      setIsLoading(false);
       showToast("Database Test Inizializzato!", 'success');
-    }, 600);
+    } catch (error) {
+      console.error('Errore generazione test data:', error);
+      showToast('Errore generazione dati di test', 'error');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Eliminare definitivamente questo record?')) {
-      deleteOrder(id);
-      setOrders(getOrders());
-      showToast("Record eliminato", 'info');
+      try {
+        await deleteOrder(id);
+        await loadOrders();
+        showToast("Record eliminato", 'info');
+      } catch (error) {
+        console.error('Errore eliminazione:', error);
+        showToast('Errore eliminazione record', 'error');
+      }
     }
   };
 
   const handleSendEmail = async (content: string, docs: string[]) => {
     if (!pendingEmailOrder) return;
     
+    if (!isAuthenticated()) {
+      showToast('Sessione scaduta. Rieffettua il login', 'error');
+      setIsSettingsOpen(true);
+      return;
+    }
+
     setIsLoading(true);
     const { order } = pendingEmailOrder;
     
-    const newWorkflow = { ...order.workflow };
-    if (docs.includes('contratto')) newWorkflow.contrattoInviato = true;
-    if (docs.includes('manuale')) newWorkflow.manualeInviato = true;
-    if (docs.includes('garanzia')) newWorkflow.garanziaRilasciata = true;
+    try {
+      // TODO: Implementare invio email reale con Gmail API
+      // const { sendEmail } = await import('./services/googleAuth');
+      // await sendEmail(order.emailContatto, 'Documentazione Fiordacqua', content);
+      
+      const newWorkflow = { ...order.workflow };
+      if (docs.includes('contratto')) newWorkflow.contrattoInviato = true;
+      if (docs.includes('manuale')) newWorkflow.manualeInviato = true;
+      if (docs.includes('garanzia')) newWorkflow.garanziaRilasciata = true;
 
-    const newStatus = newWorkflow.garanziaRilasciata ? OrderStatus.CONCLUSO : OrderStatus.IN_CORSO;
-    const updatedOrder = { ...order, workflow: newWorkflow, status: newStatus };
-    
-    await saveOrder(updatedOrder);
-    setOrders(getOrders());
-    setPendingEmailOrder(null);
-    setIsLoading(false);
-    showToast("Documentazione inviata con successo!");
+      const newStatus = newWorkflow.garanziaRilasciata ? OrderStatus.CONCLUSO : OrderStatus.IN_CORSO;
+      const updatedOrder = { ...order, workflow: newWorkflow, status: newStatus };
+      
+      await saveOrder(updatedOrder);
+      await loadOrders();
+      setPendingEmailOrder(null);
+      showToast("Documentazione inviata con successo!");
+    } catch (error: any) {
+      console.error('Errore invio email:', error);
+      showToast(error.message || 'Errore invio email', 'error');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      <Navbar activeTab={activeTab} setTab={setActiveTab} searchTerm={searchTerm} onSearch={setSearchTerm} onOpenSettings={() => setIsSettingsOpen(true)} config={config} />
+      <Navbar 
+        activeTab={activeTab} 
+        setTab={setActiveTab} 
+        searchTerm={searchTerm} 
+        onSearch={setSearchTerm} 
+        onOpenSettings={() => setIsSettingsOpen(true)} 
+        config={config} 
+      />
 
       <main className="max-w-7xl mx-auto px-4 py-8 w-full flex-grow">
-        {activeTab === 'dashboard' && <Dashboard stats={stats} onFilterStatus={handleFilterFromDashboard} onStartTest={handleSeedData} config={config} />}
-        {activeTab === 'new' && <OrderForm initialData={editingOrder} onSubmit={handleCreateOrUpdate} onCancel={() => { setActiveTab('dashboard'); setEditingOrder(null); }} />}
+        {activeTab === 'dashboard' && (
+          <Dashboard 
+            stats={stats} 
+            onFilterStatus={handleFilterFromDashboard} 
+            onStartTest={handleSeedData} 
+            config={config} 
+          />
+        )}
+        {activeTab === 'new' && (
+          <OrderForm 
+            initialData={editingOrder} 
+            onSubmit={handleCreateOrUpdate} 
+            onCancel={() => { setActiveTab('dashboard'); setEditingOrder(null); }} 
+          />
+        )}
         {activeTab === 'database' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-               <h2 className="text-2xl font-black text-slate-800 tracking-tighter uppercase italic">DATABASE <span className="text-[#00adef]">ORDINI</span></h2>
+               <h2 className="text-2xl font-black text-slate-800 tracking-tighter uppercase italic">
+                 DATABASE <span className="text-[#00adef]">ORDINI</span>
+               </h2>
                {currentFilter && (
-                 <button onClick={() => setCurrentFilter(null)} className="text-[10px] font-black text-[#00adef] uppercase tracking-widest flex items-center gap-2 border-2 border-[#00adef] px-4 py-1.5 rounded-2xl hover:bg-[#00adef] hover:text-white transition-all bg-white shadow-md">
-                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                 <button 
+                   onClick={() => setCurrentFilter(null)} 
+                   className="text-[10px] font-black text-[#00adef] uppercase tracking-widest flex items-center gap-2 border-2 border-[#00adef] px-4 py-1.5 rounded-2xl hover:bg-[#00adef] hover:text-white transition-all bg-white shadow-md"
+                 >
+                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                   </svg>
                    Reset Filtro
                  </button>
                )}
             </div>
-            <OrderTable orders={filteredOrders} onEdit={(o) => { setEditingOrder(o); setActiveTab('new'); }} onDelete={handleDelete} onPrint={setPrintingOrder} onEmailAction={(o) => setPendingEmailOrder({order: o})} onViewWorkflow={setViewingWorkflow} onToggleStatus={handleToggleManualStatus} />
+            <OrderTable 
+              orders={filteredOrders} 
+              onEdit={(o) => { setEditingOrder(o); setActiveTab('new'); }} 
+              onDelete={handleDelete} 
+              onPrint={setPrintingOrder} 
+              onEmailAction={(o) => setPendingEmailOrder({order: o})} 
+              onViewWorkflow={setViewingWorkflow} 
+              onToggleStatus={handleToggleManualStatus} 
+            />
           </div>
         )}
       </main>
 
       {toast && (
-        <div className={`fixed bottom-8 right-8 px-8 py-4 rounded-2xl shadow-2xl z-[100] animate-in slide-in-from-bottom-10 font-black uppercase tracking-widest text-[10px] flex items-center gap-3 border-2 ${toast.type === 'success' ? 'bg-green-600 border-green-500 text-white' : 'bg-slate-900 border-slate-700 text-white'}`}>
-          <div className={`${toast.type === 'success' ? 'bg-white text-green-600' : 'bg-[#00adef] text-white'} rounded-full p-1`}>
-             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" /></svg>
+        <div className={`fixed bottom-8 right-8 px-8 py-4 rounded-2xl shadow-2xl z-[100] animate-in slide-in-from-bottom-10 font-black uppercase tracking-widest text-[10px] flex items-center gap-3 border-2 ${
+          toast.type === 'success' ? 'bg-green-600 border-green-500 text-white' : 
+          toast.type === 'error' ? 'bg-red-600 border-red-500 text-white' :
+          'bg-slate-900 border-slate-700 text-white'
+        }`}>
+          <div className={`${
+            toast.type === 'success' ? 'bg-white text-green-600' : 
+            toast.type === 'error' ? 'bg-white text-red-600' :
+            'bg-[#00adef] text-white'
+          } rounded-full p-1`}>
+             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" />
+             </svg>
           </div>
           {toast.message}
         </div>
       )}
 
-      {isSettingsOpen && <SettingsModal onSave={handleSaveConfig} onClose={() => setIsSettingsOpen(false)} onSeed={handleSeedData} />}
-      {viewingWorkflow && <WorkflowModal order={viewingWorkflow} onUpdateWorkflow={handleUpdateWorkflow} onContinue={handleContinueWorkflow} onToggleStatus={handleToggleManualStatus} onClose={() => setViewingWorkflow(null)} />}
+      {isSettingsOpen && (
+        <SettingsModal 
+          onSave={handleSaveConfig} 
+          onClose={() => setIsSettingsOpen(false)} 
+          onSeed={handleSeedData} 
+        />
+      )}
+      {viewingWorkflow && (
+        <WorkflowModal 
+          order={viewingWorkflow} 
+          onUpdateWorkflow={handleUpdateWorkflow} 
+          onContinue={handleContinueWorkflow} 
+          onToggleStatus={handleToggleManualStatus} 
+          onClose={() => setViewingWorkflow(null)} 
+        />
+      )}
       {printingOrder && <PrintModal order={printingOrder} onClose={() => setPrintingOrder(null)} />}
-      {pendingEmailOrder && <EmailModal order={pendingEmailOrder.order} forcedDocType={pendingEmailOrder.forcedDoc} onSend={handleSendEmail} onClose={() => setPendingEmailOrder(null)} />}
+      {pendingEmailOrder && (
+        <EmailModal 
+          order={pendingEmailOrder.order} 
+          forcedDocType={pendingEmailOrder.forcedDoc} 
+          onSend={handleSendEmail} 
+          onClose={() => setPendingEmailOrder(null)} 
+        />
+      )}
 
       {isLoading && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex flex-col items-center justify-center text-white text-center">

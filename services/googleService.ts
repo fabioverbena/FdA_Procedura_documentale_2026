@@ -1,9 +1,8 @@
-
 import { Order, OrderStatus, AppConfig, ContractType, ModelType, ConditionType } from "../types";
+import { getToken } from "./googleAuth";
 
 const STORAGE_KEY = 'fda_orders_2026';
 const CONFIG_KEY = 'fda_config_2026';
-const AUTH_TOKEN_KEY = 'fda_google_token';
 
 const DEFAULT_CONFIG: AppConfig = {
   rootFolderId: '',
@@ -56,17 +55,219 @@ export const getDirectLogoUrl = (url?: string): string => {
   return cleanUrl;
 };
 
-export const setAuthToken = (token: string) => {
-  localStorage.setItem(AUTH_TOKEN_KEY, token);
+// ==========================================
+// CONVERSIONE: Order ↔ Array per Sheets
+// ==========================================
+const orderToRow = (order: Order): any[] => {
+  return [
+    order.id,
+    order.dataInserimento,
+    order.tipoContratto,
+    order.nomeAzienda,
+    order.rappresentanteLegale,
+    order.indirizzo,
+    order.cap,
+    order.citta,
+    order.piva,
+    order.emailContatto,
+    order.modello,
+    order.matricola,
+    order.condizione,
+    order.prezzo,
+    order.status,
+    order.workflow.contrattoInviato ? 'TRUE' : 'FALSE',
+    order.workflow.contrattoFirmato ? 'TRUE' : 'FALSE',
+    order.workflow.manualeInviato ? 'TRUE' : 'FALSE',
+    order.workflow.manualeFirmato ? 'TRUE' : 'FALSE',
+    order.workflow.garanziaRilasciata ? 'TRUE' : 'FALSE'
+  ];
 };
 
-export const getAuthToken = () => localStorage.getItem(AUTH_TOKEN_KEY);
-
-export const logoutGoogle = () => {
-  localStorage.removeItem(AUTH_TOKEN_KEY);
+const rowToOrder = (row: any[]): Order => {
+  return {
+    id: row[0] || generateSafeId(),
+    dataInserimento: row[1] || new Date().toISOString().split('T')[0],
+    tipoContratto: row[2] as ContractType || ContractType.NUOVO,
+    nomeAzienda: row[3] || '',
+    rappresentanteLegale: row[4] || '',
+    indirizzo: row[5] || '',
+    cap: row[6] || '',
+    citta: row[7] || '',
+    piva: row[8] || '',
+    emailContatto: row[9] || '',
+    modello: row[10] as ModelType || ModelType.LEO2,
+    matricola: row[11] || '',
+    condizione: row[12] as ConditionType || ConditionType.NUOVO,
+    prezzo: parseFloat(row[13]) || 0,
+    status: row[14] as OrderStatus || OrderStatus.IN_CORSO,
+    workflow: {
+      contrattoInviato: row[15] === 'TRUE',
+      contrattoFirmato: row[16] === 'TRUE',
+      manualeInviato: row[17] === 'TRUE',
+      manualeFirmato: row[18] === 'TRUE',
+      garanziaRilasciata: row[19] === 'TRUE'
+    }
+  };
 };
 
-export const getOrders = (): Order[] => {
+// ==========================================
+// GOOGLE SHEETS API - Funzioni base
+// ==========================================
+const callSheetsAPI = async (endpoint: string, options?: RequestInit) => {
+  const token = getToken();
+  if (!token) {
+    throw new Error('Non autenticato. Effettua il login Google.');
+  }
+
+  const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${endpoint}`, {
+    ...options,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      ...options?.headers
+    }
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(`Sheets API Error: ${error.error?.message || response.statusText}`);
+  }
+
+  return response.json();
+};
+
+// ==========================================
+// CRUD OPERATIONS con Google Sheets
+// ==========================================
+
+export const getOrders = async (): Promise<Order[]> => {
+  const config = getConfig();
+  
+  if (!config.spreadsheetId) {
+    console.warn('Spreadsheet ID non configurato. Uso localStorage.');
+    return getOrdersFromLocalStorage();
+  }
+
+  try {
+    const data = await callSheetsAPI(
+      `${config.spreadsheetId}/values/Ordini!A2:T?valueRenderOption=UNFORMATTED_VALUE`
+    );
+
+    if (!data.values || data.values.length === 0) {
+      return [];
+    }
+
+    return data.values.map(rowToOrder);
+  } catch (error) {
+    console.error('Errore lettura da Sheets, fallback a localStorage:', error);
+    return getOrdersFromLocalStorage();
+  }
+};
+
+export const saveOrder = async (order: Order): Promise<void> => {
+  const config = getConfig();
+  
+  if (!config.spreadsheetId) {
+    console.warn('Spreadsheet ID non configurato. Salvo in localStorage.');
+    saveOrderToLocalStorage(order);
+    return;
+  }
+
+  try {
+    const orders = await getOrders();
+    const existingIndex = orders.findIndex(o => o.id === order.id);
+    
+    if (existingIndex >= 0) {
+      // UPDATE: Aggiorna riga esistente
+      const rowNumber = existingIndex + 2; // +2 perché: riga 1 = header, array inizia da 0
+      await callSheetsAPI(
+        `${config.spreadsheetId}/values/Ordini!A${rowNumber}:T${rowNumber}?valueInputOption=RAW`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            values: [orderToRow(order)]
+          })
+        }
+      );
+    } else {
+      // INSERT: Aggiungi nuova riga
+      await callSheetsAPI(
+        `${config.spreadsheetId}/values/Ordini!A:T:append?valueInputOption=RAW`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            values: [orderToRow(order)]
+          })
+        }
+      );
+    }
+    
+    // Aggiorna anche localStorage come backup
+    saveOrderToLocalStorage(order);
+  } catch (error) {
+    console.error('Errore salvataggio su Sheets, fallback a localStorage:', error);
+    saveOrderToLocalStorage(order);
+    throw error;
+  }
+};
+
+export const deleteOrder = async (id: string): Promise<void> => {
+  const config = getConfig();
+  
+  if (!config.spreadsheetId) {
+    deleteOrderFromLocalStorage(id);
+    return;
+  }
+
+  try {
+    const orders = await getOrders();
+    const index = orders.findIndex(o => o.id === id);
+    
+    if (index >= 0) {
+      const rowNumber = index + 2;
+      
+      // Elimina riga da Sheets
+      await callSheetsAPI(
+        `${config.spreadsheetId}:batchUpdate`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            requests: [{
+              deleteDimension: {
+                range: {
+                  sheetId: 0,
+                  dimension: 'ROWS',
+                  startIndex: rowNumber - 1,
+                  endIndex: rowNumber
+                }
+              }
+            }]
+          })
+        }
+      );
+    }
+    
+    deleteOrderFromLocalStorage(id);
+  } catch (error) {
+    console.error('Errore eliminazione da Sheets:', error);
+    deleteOrderFromLocalStorage(id);
+    throw error;
+  }
+};
+
+export const updateOrderStatus = async (id: string, status: OrderStatus): Promise<void> => {
+  const orders = await getOrders();
+  const order = orders.find(o => o.id === id);
+  if (order) {
+    order.status = status;
+    await saveOrder(order);
+  }
+};
+
+// ==========================================
+// FALLBACK: localStorage operations
+// ==========================================
+const getOrdersFromLocalStorage = (): Order[] => {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
     return data ? JSON.parse(data) : [];
@@ -75,8 +276,8 @@ export const getOrders = (): Order[] => {
   }
 };
 
-export const saveOrder = async (order: Order): Promise<void> => {
-  const orders = getOrders();
+const saveOrderToLocalStorage = (order: Order): void => {
+  const orders = getOrdersFromLocalStorage();
   const index = orders.findIndex(o => o.id === order.id);
   if (index >= 0) {
     orders[index] = { ...order };
@@ -86,21 +287,15 @@ export const saveOrder = async (order: Order): Promise<void> => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
 };
 
-export const deleteOrder = (id: string): void => {
-  const orders = getOrders().filter(o => o.id !== id);
+const deleteOrderFromLocalStorage = (id: string): void => {
+  const orders = getOrdersFromLocalStorage().filter(o => o.id !== id);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
 };
 
-export const updateOrderStatus = (id: string, status: OrderStatus): void => {
-  const orders = getOrders();
-  const orderIndex = orders.findIndex(o => o.id === id);
-  if (orderIndex >= 0) {
-    orders[orderIndex].status = status;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
-  }
-};
-
-export const seedTestData = (): Order[] => {
+// ==========================================
+// SEED TEST DATA
+// ==========================================
+export const seedTestData = async (): Promise<Order[]> => {
   const aziende = ["Acqua Lux Veneto", "Pure Hydro S.r.l.", "TecnoBlu Impianti", "EcoDose Italia", "IdroSistemi 2026", "Crystal Flow", "AquaService Pro", "H2O Innovazione", "Blue Future", "Nettuno Tech"];
   const modelli = Object.values(ModelType);
   const tipi = Object.values(ContractType);
@@ -130,6 +325,10 @@ export const seedTestData = (): Order[] => {
     }
   }));
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(testOrders));
+  // Salva sia su Sheets che su localStorage
+  for (const order of testOrders) {
+    await saveOrder(order);
+  }
+
   return testOrders;
 };

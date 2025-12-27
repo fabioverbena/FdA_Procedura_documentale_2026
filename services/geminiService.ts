@@ -1,9 +1,9 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { Order } from "../types";
 
-// Inizializzazione rigorosa come da specifiche
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Inizializzazione con supporto per variabili d'ambiente Vite
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
+const ai = new GoogleGenAI({ apiKey });
 
 export const generateProfessionalEmail = async (order: Order, documentType: 'contratto' | 'manuale' | 'garanzia'): Promise<string> => {
   const prompt = `
