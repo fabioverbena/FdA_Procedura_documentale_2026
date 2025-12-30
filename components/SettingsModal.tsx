@@ -41,10 +41,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onSave, onClose, onSeed }
   };
 
   const handleSave = () => {
-    saveConfig(config);
-    onSave(config);
-    onClose();
-  };
+  console.log('Salvataggio config:', config);
+  saveConfig(config);
+  
+  // Verifica che sia stato salvato
+  const saved = getConfig();
+  console.log('Config salvata verificata:', saved);
+  
+  onSave(config);
+  onClose();
+};
 
   const handleAuth = () => {
     if (authenticated) {

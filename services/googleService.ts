@@ -150,7 +150,7 @@ export const getOrders = async (): Promise<Order[]> => {
 
   try {
     const data = await callSheetsAPI(
-      `${config.spreadsheetId}/values/Ordini!A2:T?valueRenderOption=UNFORMATTED_VALUE`
+      `${config.spreadsheetId}/values/A2:T?valueRenderOption=UNFORMATTED_VALUE`
     );
 
     if (!data.values || data.values.length === 0) {
@@ -181,7 +181,7 @@ export const saveOrder = async (order: Order): Promise<void> => {
       // UPDATE: Aggiorna riga esistente
       const rowNumber = existingIndex + 2; // +2 perché: riga 1 = header, array inizia da 0
       await callSheetsAPI(
-        `${config.spreadsheetId}/values/Ordini!A${rowNumber}:T${rowNumber}?valueInputOption=RAW`,
+        `${config.spreadsheetId}/values/A${rowNumber}:T${rowNumber}?valueInputOption=RAW`,
         {
           method: 'PUT',
           body: JSON.stringify({
@@ -192,7 +192,7 @@ export const saveOrder = async (order: Order): Promise<void> => {
     } else {
       // INSERT: Aggiungi nuova riga
       await callSheetsAPI(
-        `${config.spreadsheetId}/values/Ordini!A:T:append?valueInputOption=RAW`,
+        `${config.spreadsheetId}/values/A:T:append?valueInputOption=RAW`,
         {
           method: 'POST',
           body: JSON.stringify({
