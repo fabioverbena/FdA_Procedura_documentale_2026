@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Order, OrderStatus, DashboardStats, AppConfig } from './types';
 import { getOrders, saveOrder, deleteOrder, updateOrderStatus, getConfig, seedTestData, generateSafeId } from './services/googleService';
-import { handleOAuthCallback, isAuthenticated } from './services/googleAuth';
+import { handleOAuthCallback, isAuthenticated, sendEmail } from './services/googleAuth';
+import { generateAndPrintDocument } from './services/googleDriveService';
+import { generateProfessionalEmail } from './services/geminiService';
 import Navbar from './components/Navbar';
 import Dashboard from './components/Dashboard';
 import OrderForm from './components/OrderForm';
@@ -128,8 +130,11 @@ const App: React.FC = () => {
       
       showToast(`Ordine ${orderData.nomeAzienda} salvato.`);
       
-      if (action === 'email') setPendingEmailOrder({ order: orderData, forcedDoc: 'contratto' });
-      else if (action === 'print') setPrintingOrder(orderData);
+      if (action === 'email') {
+        setPendingEmailOrder({ order: orderData, forcedDoc: 'contratto' });
+      } else if (action === 'print') {
+        setPrintingOrder(orderData);
+      }
     } catch (error) {
       console.error('Errore salvataggio ordine:', error);
       showToast('Errore salvataggio ordine', 'error');
@@ -218,6 +223,9 @@ const App: React.FC = () => {
     }
   };
 
+  // ==========================================
+  // 🔥 FIX PRINCIPALE: INVIO EMAIL REALE
+  // ==========================================
   const handleSendEmail = async (content: string, docs: string[]) => {
     if (!pendingEmailOrder) return;
     
@@ -231,10 +239,16 @@ const App: React.FC = () => {
     const { order } = pendingEmailOrder;
     
     try {
-      // TODO: Implementare invio email reale con Gmail API
-      // const { sendEmail } = await import('./services/googleAuth');
-      // await sendEmail(order.emailContatto, 'Documentazione Fiordacqua', content);
+      // 1. Invia email reale tramite Gmail API
+      const subject = `Fiordacqua - Documentazione ${docs.join(', ')} per ${order.nomeAzienda}`;
       
+      await sendEmail(
+        order.emailContatto,
+        subject,
+        content
+      );
+
+      // 2. Aggiorna workflow
       const newWorkflow = { ...order.workflow };
       if (docs.includes('contratto')) newWorkflow.contrattoInviato = true;
       if (docs.includes('manuale')) newWorkflow.manualeInviato = true;
@@ -246,10 +260,38 @@ const App: React.FC = () => {
       await saveOrder(updatedOrder);
       await loadOrders();
       setPendingEmailOrder(null);
-      showToast("Documentazione inviata con successo!");
+      showToast("Email inviata con successo!");
     } catch (error: any) {
       console.error('Errore invio email:', error);
       showToast(error.message || 'Errore invio email', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ==========================================
+  // 🔥 NUOVO: GESTIONE STAMPA/GENERAZIONE PDF
+  // ==========================================
+  const handlePrintDocument = async (documentType: 'contratto' | 'manuale' | 'garanzia') => {
+    if (!printingOrder) return;
+
+    if (!isAuthenticated()) {
+      showToast('Effettua il login Google per generare documenti', 'error');
+      setIsSettingsOpen(true);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Genera e scarica PDF da Google Drive
+      await generateAndPrintDocument(printingOrder, documentType);
+      
+      showToast(`${documentType.toUpperCase()} generato e scaricato!`, 'success');
+      
+      setPrintingOrder(null);
+    } catch (error: any) {
+      console.error('Errore generazione documento:', error);
+      showToast(error.message || 'Errore generazione documento', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -348,7 +390,13 @@ const App: React.FC = () => {
           onClose={() => setViewingWorkflow(null)} 
         />
       )}
-      {printingOrder && <PrintModal order={printingOrder} onClose={() => setPrintingOrder(null)} />}
+      {printingOrder && (
+        <PrintModal 
+          order={printingOrder} 
+          onClose={() => setPrintingOrder(null)}
+          onPrint={handlePrintDocument}
+        />
+      )}
       {pendingEmailOrder && (
         <EmailModal 
           order={pendingEmailOrder.order} 

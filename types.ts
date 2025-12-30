@@ -50,18 +50,14 @@ export interface Order {
   status: OrderStatus;
   workflow: {
     // STEP 1-3: Contratto
-    contrattoCreato: boolean;      // STEP 1: Documento creato e scaricato
     contrattoInviato: boolean;     // STEP 2: Email inviata al cliente
     contrattoFirmato: boolean;     // STEP 3: FLAG manuale - Cliente ha accettato
     
     // STEP 4-6: Manuale
-    manualeCreato: boolean;        // STEP 4: Documento creato e scaricato
     manualeInviato: boolean;       // STEP 5: Email inviata al cliente
     manualeFirmato: boolean;       // STEP 6: FLAG manuale - Cliente ha letto/controfirmato
     
     // STEP 7-9: Garanzia
-    garanziaCreata: boolean;       // STEP 7: Documento creato e scaricato
-    garanziaInviata: boolean;      // STEP 8: Email inviata al cliente
     garanziaRilasciata: boolean;   // STEP 9: Automatico (= garanziaInviata)
   };
 }
@@ -73,44 +69,93 @@ export interface DashboardStats {
   inCorso: number;
 }
 
-// Helper per determinare lo step corrente
+// ==========================================
+// HELPER: DETERMINA STEP CORRENTE
+// ==========================================
 export const getCurrentStep = (workflow: Order['workflow']): number => {
-  if (!workflow.contrattoCreato) return 1;
-  if (!workflow.contrattoInviato) return 2;
-  if (!workflow.contrattoFirmato) return 3;
-  if (!workflow.manualeCreato) return 4;
-  if (!workflow.manualeInviato) return 5;
-  if (!workflow.manualeFirmato) return 6;
-  if (!workflow.garanziaCreata) return 7;
-  if (!workflow.garanziaInviata) return 8;
-  return 9; // Concluso
+  if (!workflow.contrattoInviato) return 1;
+  if (!workflow.contrattoFirmato) return 2;
+  if (!workflow.manualeInviato) return 3;
+  if (!workflow.manualeFirmato) return 4;
+  if (!workflow.garanziaRilasciata) return 5;
+  return 6; // Concluso
 };
 
-// Helper per verificare se un'azione è permessa
+// ==========================================
+// HELPER: TESTO DESCRITTIVO DELLO STEP
+// ==========================================
+export const getStepDescription = (step: number): string => {
+  const descriptions: Record<number, string> = {
+    1: 'In attesa di invio contratto',
+    2: 'Contratto inviato - In attesa firma cliente',
+    3: 'Contratto firmato - In attesa invio manuale',
+    4: 'Manuale inviato - In attesa firma cliente',
+    5: 'Manuale firmato - In attesa rilascio garanzia',
+    6: 'Iter completato - Garanzia rilasciata'
+  };
+  return descriptions[step] || 'Step sconosciuto';
+};
+
+// ==========================================
+// HELPER: PROGRESSO PERCENTUALE
+// ==========================================
+export const getProgressPercentage = (workflow: Order['workflow']): number => {
+  const currentStep = getCurrentStep(workflow);
+  return Math.round((currentStep / 6) * 100);
+};
+
+// ==========================================
+// HELPER: VERIFICA AZIONI PERMESSE
+// ==========================================
 export const canPerformAction = (
   workflow: Order['workflow'],
-  action: 'create_contratto' | 'send_contratto' | 'create_manuale' | 'send_manuale' | 'create_garanzia' | 'send_garanzia'
+  action: 'send_contratto' | 'send_manuale' | 'send_garanzia'
 ): boolean => {
   switch (action) {
-    case 'create_contratto':
+    case 'send_contratto':
       return true; // Sempre permesso (primo step)
     
-    case 'send_contratto':
-      return workflow.contrattoCreato;
-    
-    case 'create_manuale':
+    case 'send_manuale':
       return workflow.contrattoFirmato; // Richiede conferma contratto
     
-    case 'send_manuale':
-      return workflow.manualeCreato;
-    
-    case 'create_garanzia':
-      return workflow.manualeFirmato; // Richiede conferma manuale
-    
     case 'send_garanzia':
-      return workflow.garanziaCreata;
+      return workflow.manualeFirmato; // Richiede conferma manuale
     
     default:
       return false;
   }
+};
+
+// ==========================================
+// HELPER: PROSSIMA AZIONE RACCOMANDATA
+// ==========================================
+export const getNextAction = (workflow: Order['workflow']): string => {
+  if (!workflow.contrattoInviato) return 'Invia Contratto';
+  if (!workflow.contrattoFirmato) return 'Attendere firma contratto';
+  if (!workflow.manualeInviato) return 'Invia Manuale';
+  if (!workflow.manualeFirmato) return 'Attendere conferma manuale';
+  if (!workflow.garanziaRilasciata) return 'Invia Garanzia';
+  return 'Iter completato';
+};
+
+// ==========================================
+// HELPER: VALIDAZIONE ORDINE
+// ==========================================
+export const validateOrder = (order: Partial<Order>): string[] => {
+  const errors: string[] = [];
+
+  if (!order.nomeAzienda?.trim()) errors.push('Nome Azienda obbligatorio');
+  if (!order.rappresentanteLegale?.trim()) errors.push('Rappresentante Legale obbligatorio');
+  if (!order.piva?.trim()) errors.push('P.IVA obbligatoria');
+  if (!order.emailContatto?.trim()) errors.push('Email obbligatoria');
+  if (!order.modello) errors.push('Modello obbligatorio');
+  if (!order.matricola?.trim()) errors.push('Matricola obbligatoria');
+  if (!order.prezzo || order.prezzo <= 0) errors.push('Prezzo deve essere maggiore di 0');
+
+  // Validazione formato email
+  if (order.emailContatto && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(order.emailContatto)) {
+    errors.push('Email non valida');
+  }
+
+  return errors;
 };
