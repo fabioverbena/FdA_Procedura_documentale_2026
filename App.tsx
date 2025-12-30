@@ -286,7 +286,7 @@ const App: React.FC = () => {
           <div className="space-y-4">
             <div className="flex justify-between items-center">
                <h2 className="text-2xl font-black text-slate-800 tracking-tighter uppercase italic">
-                 DATABASE <span className="text-[#00adef]">ORDINI</span>
+                 DATABASE <span className="text-[#00adef]">ORDINI 2026</span>
                </h2>
                {currentFilter && (
                  <button 
