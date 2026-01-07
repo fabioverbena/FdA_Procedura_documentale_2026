@@ -1,7 +1,5 @@
-
 import React from 'react';
 import { DashboardStats, OrderStatus, AppConfig } from '../types';
-import { getDirectLogoUrl } from '../services/googleService';
 
 interface DashboardProps {
   stats: DashboardStats;
@@ -10,9 +8,7 @@ interface DashboardProps {
   config: AppConfig;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ stats, onFilterStatus, onStartTest, config }) => {
-  const logoUrl = getDirectLogoUrl(config.logoUrl);
-
+const Dashboard: React.FC<DashboardProps> = ({ stats, onFilterStatus, onStartTest }) => {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -39,7 +35,7 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onFilterStatus, onStartTes
           )}
         </div>
 
-        {/* Box Sospesi - LA LABEL MANCANTE */}
+        {/* Box Sospesi */}
         <div onClick={() => onFilterStatus(OrderStatus.SOSPESO)} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all border-t-4 border-t-yellow-400">
           <p className="text-xs font-black text-slate-400 uppercase tracking-widest text-yellow-600">Sospesi</p>
           <p className="text-5xl font-black text-yellow-500 mt-2 tracking-tighter">{stats.sospesi}</p>
@@ -57,18 +53,11 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onFilterStatus, onStartTes
       <div className="bg-slate-900 p-12 rounded-3xl text-white shadow-2xl relative overflow-hidden group">
         <div className="relative z-10 flex flex-col md:flex-row items-center gap-12">
           <div className="bg-white p-6 rounded-3xl shadow-2xl transition-transform group-hover:rotate-3 duration-500 min-w-[140px] flex items-center justify-center overflow-hidden h-32 w-48">
-            {logoUrl ? (
-              <img 
-                src={logoUrl} 
-                alt="Fiordacqua" 
-                className="max-h-full max-w-full object-contain animate-in zoom-in duration-300" 
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = 'https://placehold.co/200x200?text=Logo+FA';
-                }} 
-              />
-            ) : (
-              <div className="w-20 h-20 bg-[#00adef] text-white flex items-center justify-center text-4xl font-black rounded-2xl italic">FA</div>
-            )}
+            <img 
+              src="/logo.jpg" 
+              alt="Fiordacqua" 
+              className="max-h-full max-w-full object-contain animate-in zoom-in duration-300" 
+            />
           </div>
           <div>
             <h2 className="text-4xl font-black italic tracking-tighter uppercase leading-tight">CONSOLE OPERATIVA <span className="text-[#00adef] not-italic">FIORDACQUA</span></h2>
@@ -87,6 +76,15 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onFilterStatus, onStartTes
           </div>
         </div>
         <div className="absolute top-0 right-0 w-1/3 h-full bg-[#00adef]/5 skew-x-12 transform translate-x-1/2"></div>
+      </div>
+
+      {/* Logo Footer con Blur */}
+      <div className="flex justify-center py-12">
+        <img 
+          src="/logo.jpg" 
+          alt="" 
+          className="w-[800px] h-auto opacity-60 blur-sm grayscale"
+        />
       </div>
     </div>
   );

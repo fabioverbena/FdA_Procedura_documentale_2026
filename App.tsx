@@ -313,7 +313,9 @@ const App: React.FC = () => {
         updatedOrder.workflow.manualeInviato = true;
       } else if (docType === 'garanzia') {
         updatedOrder.workflow.garanziaRilasciata = true;
-      }
+      } if (updatedOrder.workflow.garanziaRilasciata) {
+  updatedOrder.status = OrderStatus.CONCLUSO;
+}
 
       await saveOrder(updatedOrder);
       console.log('✅ Stato ordine aggiornato');
@@ -347,40 +349,54 @@ const App: React.FC = () => {
     }
   };
 
-  const handlePrintDocument = async (documentType: 'contratto' | 'manuale' | 'garanzia') => {
-    if (!printingOrder) return;
+ const handlePrintDocument = async (documentType: 'contratto' | 'manuale' | 'garanzia') => {
+  if (!printingOrder) return;
 
-    if (!isAuthenticated()) {
-      showToast('Effettua il login Google per generare documenti', 'error');
-      setIsSettingsOpen(true);
-      return;
-    }
+  if (!isAuthenticated()) {
+    showToast('Effettua il login Google per generare documenti', 'error');
+    setIsSettingsOpen(true);
+    return;
+  }
 
-    setIsLoading(true);
-    try {
-      await generateAndPrintDocument(printingOrder, documentType);
+  setIsLoading(true);
+  try {
+    const result = await generateAndPrintDocument(printingOrder, documentType);
+    
+    if (result) {
+      // Scarica il PDF
+      const bytes = Uint8Array.from(atob(result.base64), c => c.charCodeAt(0));
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
       
-      showToast(`${documentType.toUpperCase()} generato e scaricato!`, 'success');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = result.filename;
+      a.click();
       
-      setPrintingOrder(null);
-    } catch (error: any) {
-      console.error('Errore generazione documento:', error);
-      showToast(error.message || 'Errore generazione documento', 'error');
-    } finally {
-      setIsLoading(false);
+      URL.revokeObjectURL(url);
+      
+      showToast('PDF scaricato!', 'success');
     }
-  };
+    
+    setPrintingOrder(null);
+  } catch (error: any) {
+    console.error('Errore generazione:', error);
+    showToast(error.message || 'Errore', 'error');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col relative">
       {/* 🎨 WATERMARK LOGO SFUMATO */}
-      <div className="fixed inset-0 pointer-events-none z-0 flex items-center justify-center">
-        <img 
-          src="/logo.jpg" 
-          alt="" 
-          className="w-[900px] h-auto opacity-[0.30] blur-[2px]"
-        />
-      </div>
+     <div className="fixed inset-0 pointer-events-none z-[5] flex items-center justify-center">
+  <img 
+    src="/logo.jpg" 
+    alt="" 
+    className="w-[1200px] h-auto opacity-[0.25] mt-32"
+  />
+</div>
       
       {/* Contenuto sopra il watermark */}
       <div className="relative z-10 flex flex-col min-h-screen">

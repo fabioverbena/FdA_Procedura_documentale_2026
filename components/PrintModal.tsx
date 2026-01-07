@@ -1,24 +1,47 @@
-
 import React, { useState } from 'react';
 import { Order } from '../types';
 
 interface PrintModalProps {
   order: Order;
   onClose: () => void;
+  onPrint: (documentType: 'contratto' | 'manuale' | 'garanzia') => Promise<void>;
 }
 
-const PrintModal: React.FC<PrintModalProps> = ({ order, onClose }) => {
+const PrintModal: React.FC<PrintModalProps> = ({ order, onClose, onPrint }) => {
   const [copies, setCopies] = useState(1);
+  const [isPrinting, setIsPrinting] = useState(false);
   const [docs, setDocs] = useState({
     contratto: true,
     manuale: order.workflow.contrattoFirmato,
     garanzia: order.workflow.manualeFirmato
   });
 
-  const handlePrint = () => {
-    const selectedDocs = Object.entries(docs).filter(([_, v]) => v).map(([k, _]) => k.toUpperCase());
-    alert(`Preparazione stampa per: ${selectedDocs.join(', ')}\nCopie: ${copies}\n(Funzione di stampa PDF simulata)`);
-    onClose();
+  const handlePrint = async () => {
+    const selectedDocs = Object.entries(docs)
+      .filter(([_, v]) => v)
+      .map(([k, _]) => k as 'contratto' | 'manuale' | 'garanzia');
+    
+    if (selectedDocs.length === 0) {
+      alert('Seleziona almeno un documento!');
+      return;
+    }
+
+    setIsPrinting(true);
+    
+    try {
+      for (const docType of selectedDocs) {
+        for (let i = 0; i < copies; i++) {
+          await onPrint(docType);
+        }
+      }
+      
+      onClose();
+    } catch (error) {
+      console.error('Errore stampa:', error);
+      alert('Errore durante la generazione dei documenti');
+    } finally {
+      setIsPrinting(false);
+    }
   };
 
   return (
@@ -64,13 +87,25 @@ const PrintModal: React.FC<PrintModalProps> = ({ order, onClose }) => {
         </div>
 
         <div className="p-6 bg-slate-50 border-t flex justify-end gap-3">
-          <button onClick={onClose} className="px-6 py-2 text-slate-600 font-medium hover:text-slate-800">Annulla</button>
+          <button onClick={onClose} disabled={isPrinting} className="px-6 py-2 text-slate-600 font-medium hover:text-slate-800 disabled:opacity-50">
+            Annulla
+          </button>
           <button 
             onClick={handlePrint}
-            className="px-8 py-2 bg-slate-900 text-white font-bold rounded-lg shadow-lg hover:bg-slate-800 transition-all flex items-center gap-2"
+            disabled={isPrinting}
+            className="px-8 py-2 bg-slate-900 text-white font-bold rounded-lg shadow-lg hover:bg-slate-800 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-            <span>Stampa Ora</span>
+            {isPrinting ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <span>Generazione...</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                <span>Stampa Ora</span>
+              </>
+            )}
           </button>
         </div>
       </div>

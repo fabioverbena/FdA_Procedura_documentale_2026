@@ -1,7 +1,5 @@
-
 import React from 'react';
 import { AppConfig } from '../types';
-import { getDirectLogoUrl } from '../services/googleService';
 
 interface NavbarProps {
   searchTerm: string;
@@ -12,9 +10,7 @@ interface NavbarProps {
   config: AppConfig;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ searchTerm, onSearch, activeTab, setTab, onOpenSettings, config }) => {
-  const logoUrl = getDirectLogoUrl(config.logoUrl);
-
+const Navbar: React.FC<NavbarProps> = ({ searchTerm, onSearch, activeTab, setTab, onOpenSettings }) => {
   const handleSearchChange = (value: string) => {
     onSearch(value);
     if (value.trim() !== '' && activeTab !== 'database') {
@@ -28,20 +24,11 @@ const Navbar: React.FC<NavbarProps> = ({ searchTerm, onSearch, activeTab, setTab
         <div className="flex justify-between h-20 items-center">
           <div className="flex items-center gap-10">
             <div onClick={() => setTab('dashboard')} className="cursor-pointer hover:opacity-80 transition-opacity">
-              {logoUrl ? (
-                <img src={logoUrl} alt="Fiordacqua" className="h-10 w-auto object-contain" onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }} />
-              ) : null}
-              {(!logoUrl) && (
-                <div className="flex items-center gap-3">
-                   <div className="w-10 h-10 bg-[#00adef] text-white rounded-xl flex items-center justify-center font-black shadow-lg shadow-[#00adef]/20">FA</div>
-                   <div className="flex flex-col -space-y-1">
-                      <span className="font-black text-slate-900 tracking-tighter uppercase text-lg italic">FIORDACQUA</span>
-                      <span className="text-[8px] font-bold text-[#00adef] tracking-[0.2em] uppercase">Procedura Documentale</span>
-                   </div>
-                </div>
-              )}
+              <img 
+                src="/logo.jpg" 
+                alt="Fiordacqua" 
+                className="h-12 w-auto object-contain" 
+              />
             </div>
 
             <div className="hidden md:flex space-x-1">
