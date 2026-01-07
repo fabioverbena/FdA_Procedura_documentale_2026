@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { Order } from '../types';
-import { generateProfessionalEmail } from '../services/geminiService';
+import { generateProfessionalEmail } from '../services/claudeService';
 
 interface EmailModalProps {
   order: Order;
@@ -36,9 +35,10 @@ const EmailModal: React.FC<EmailModalProps> = ({ order, onSend, onClose, forcedD
     }
 
     try {
-      const content = await generateProfessionalEmail(order, doc as any);
+      const content = await generateProfessionalEmail(order, doc);
       setEmailContent(content);
     } catch (error) {
+      console.error('Errore generazione email:', error);
       setEmailContent("Gentile Cliente, in allegato i documenti relativi alla procedura Fiordacqua. Restiamo a disposizione. Cordiali saluti.");
     } finally {
       setIsGenerating(false);
@@ -104,7 +104,7 @@ const EmailModal: React.FC<EmailModalProps> = ({ order, onSend, onClose, forcedD
                 <div className="flex flex-col items-center justify-center py-16 space-y-6">
                   <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
                   <div className="text-center">
-                    <p className="text-slate-800 font-black uppercase tracking-widest text-xs">Gemini AI sta elaborando...</p>
+                    <p className="text-slate-800 font-black uppercase tracking-widest text-xs">Claude AI sta elaborando...</p>
                     <p className="text-slate-400 text-[10px] font-bold mt-1 uppercase">Scrittura email professionale in corso</p>
                   </div>
                 </div>

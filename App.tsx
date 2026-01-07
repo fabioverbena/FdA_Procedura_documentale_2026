@@ -3,7 +3,6 @@ import { Order, OrderStatus, DashboardStats, AppConfig } from './types';
 import { getOrders, saveOrder, deleteOrder, updateOrderStatus, getConfig, seedTestData, generateSafeId } from './services/googleService';
 import { handleOAuthCallback, isAuthenticated, sendEmail } from './services/googleAuth';
 import { generateAndPrintDocument } from './services/googleDriveService';
-import { generateProfessionalEmail } from './services/geminiService';
 import Navbar from './components/Navbar';
 import Dashboard from './components/Dashboard';
 import OrderForm from './components/OrderForm';
@@ -28,7 +27,6 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
 
-  // Gestisce il callback OAuth al caricamento dell'app
   useEffect(() => {
     const urlHasToken = window.location.hash.includes('access_token');
     
@@ -42,7 +40,6 @@ const App: React.FC = () => {
       }
     }
     
-    // Carica ordini all'avvio
     loadOrders();
   }, []);
 
@@ -161,23 +158,38 @@ const App: React.FC = () => {
   };
 
   const handleUpdateWorkflow = async (id: string, workflow: Order['workflow']) => {
+    console.log('🔵 handleUpdateWorkflow chiamato:', { id, workflow });
+    
     const order = orders.find(o => o.id === id);
+    console.log('🔵 Ordine trovato:', order);
+    
     if (order) {
       try {
         const isFinishing = workflow.garanziaRilasciata && order.status !== OrderStatus.CONCLUSO;
         const newStatus = workflow.garanziaRilasciata ? OrderStatus.CONCLUSO : order.status;
         const updatedOrder = { ...order, workflow, status: newStatus };
         
+        console.log('🔵 Salvando ordine aggiornato:', updatedOrder);
+        
         await saveOrder(updatedOrder);
+        
+        console.log('✅ Ordine salvato!');
+        
         await loadOrders();
         
         const updated = await getOrders();
-        setViewingWorkflow(updated.find(o => o.id === id) || null);
+        const refreshed = updated.find(o => o.id === id);
+        
+        console.log('🔵 Ordine ricaricato:', refreshed);
+        
+        setViewingWorkflow(refreshed || null);
         showToast(isFinishing ? "Iter CONCLUSO con successo!" : "Avanzamento registrato");
       } catch (error) {
-        console.error('Errore aggiornamento workflow:', error);
+        console.error('❌ Errore aggiornamento workflow:', error);
         showToast('Errore aggiornamento workflow', 'error');
       }
+    } else {
+      console.error('❌ Ordine non trovato con id:', id);
     }
   };
 
@@ -223,9 +235,14 @@ const App: React.FC = () => {
     }
   };
 
-  // ==========================================
-  // 🔥 FIX PRINCIPALE: INVIO EMAIL REALE
-  // ==========================================
+  const handleTabChange = (tab: 'dashboard' | 'new' | 'database') => {
+    if (tab === 'new' && editingOrder !== null) {
+      console.log('🔵 Reset editingOrder per nuovo ordine');
+      setEditingOrder(null);
+    }
+    setActiveTab(tab);
+  };
+
   const handleSendEmail = async (content: string, docs: string[]) => {
     if (!pendingEmailOrder) return;
     
@@ -235,43 +252,101 @@ const App: React.FC = () => {
       return;
     }
 
-    setIsLoading(true);
     const { order } = pendingEmailOrder;
-    
+    setIsLoading(true);
+
     try {
-      // 1. Invia email reale tramite Gmail API
-      const subject = `Fiordacqua - Documentazione ${docs.join(', ')} per ${order.nomeAzienda}`;
+      console.log('📧 Inizio processo invio email con PDF allegato...');
+
+      const docType = docs[0] as 'contratto' | 'ddt' | 'fattura' | 'ordine' | 'installazione';
       
-      await sendEmail(
+      console.log('📄 Generazione PDF da template:', docType);
+      showToast('Generazione PDF in corso...', 'info');
+      
+      const pdfResult = await generateAndPrintDocument(order, docType);
+      
+      if (!pdfResult) {
+        throw new Error('Errore generazione PDF da template Google Docs');
+      }
+
+      console.log('✅ PDF generato:', pdfResult.filename);
+
+      const attachment = {
+        filename: pdfResult.filename,
+        mimeType: 'application/pdf',
+        data: pdfResult.base64
+      };
+
+      const docLabels: Record<string, string> = {
+        'contratto': 'Contratto di Vendita',
+        'ddt': 'Documento di Trasporto',
+        'fattura': 'Fattura',
+        'ordine': 'Ordine Fornitore',
+        'installazione': 'Report Installazione',
+        'manuale': 'Manuale Operativo',
+        'garanzia': 'Certificato di Garanzia'
+      };
+
+      const subject = `Fiordacqua - ${docLabels[docType] || docType} - ${order.nomeAzienda}`;
+
+      console.log('📧 Invio email a:', order.emailContatto);
+      showToast('Invio email in corso...', 'info');
+      
+      const emailSent = await sendEmail(
         order.emailContatto,
         subject,
-        content
+        content,
+        [attachment]
       );
 
-      // 2. Aggiorna workflow
-      const newWorkflow = { ...order.workflow };
-      if (docs.includes('contratto')) newWorkflow.contrattoInviato = true;
-      if (docs.includes('manuale')) newWorkflow.manualeInviato = true;
-      if (docs.includes('garanzia')) newWorkflow.garanziaRilasciata = true;
+      if (!emailSent) {
+        throw new Error('Errore invio email tramite Gmail API');
+      }
 
-      const newStatus = newWorkflow.garanziaRilasciata ? OrderStatus.CONCLUSO : OrderStatus.IN_CORSO;
-      const updatedOrder = { ...order, workflow: newWorkflow, status: newStatus };
-      
+      console.log('✅ Email inviata con successo!');
+
+      const updatedOrder = { ...order };
+
+      if (docType === 'contratto') {
+        updatedOrder.workflow.contrattoInviato = true;
+      } else if (docType === 'manuale') {
+        updatedOrder.workflow.manualeInviato = true;
+      } else if (docType === 'garanzia') {
+        updatedOrder.workflow.garanziaRilasciata = true;
+      }
+
       await saveOrder(updatedOrder);
+      console.log('✅ Stato ordine aggiornato');
+      
       await loadOrders();
       setPendingEmailOrder(null);
-      showToast("Email inviata con successo!");
+      
+      showToast('✅ Email inviata con successo con allegato PDF!', 'success');
+      
+      console.log('🎉 Processo completato con successo!');
+
     } catch (error: any) {
-      console.error('Errore invio email:', error);
-      showToast(error.message || 'Errore invio email', 'error');
+      console.error('❌ Errore durante il processo:', error);
+      
+      let errorMessage = 'Errore durante l\'invio dell\'email';
+      
+      if (error.message?.includes('Token')) {
+        errorMessage = 'Sessione scaduta. Rieffettua il login.';
+        setIsSettingsOpen(true);
+      } else if (error.message?.includes('PDF')) {
+        errorMessage = 'Errore generazione PDF: ' + error.message;
+      } else if (error.message?.includes('email')) {
+        errorMessage = 'Errore invio email: ' + error.message;
+      } else {
+        errorMessage = error.message || errorMessage;
+      }
+      
+      showToast(errorMessage, 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // ==========================================
-  // 🔥 NUOVO: GESTIONE STAMPA/GENERAZIONE PDF
-  // ==========================================
   const handlePrintDocument = async (documentType: 'contratto' | 'manuale' | 'garanzia') => {
     if (!printingOrder) return;
 
@@ -283,7 +358,6 @@ const App: React.FC = () => {
 
     setIsLoading(true);
     try {
-      // Genera e scarica PDF da Google Drive
       await generateAndPrintDocument(printingOrder, documentType);
       
       showToast(`${documentType.toUpperCase()} generato e scaricato!`, 'success');
@@ -298,120 +372,132 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      <Navbar 
-        activeTab={activeTab} 
-        setTab={setActiveTab} 
-        searchTerm={searchTerm} 
-        onSearch={setSearchTerm} 
-        onOpenSettings={() => setIsSettingsOpen(true)} 
-        config={config} 
-      />
+    <div className="min-h-screen bg-slate-50 flex flex-col relative">
+      {/* 🎨 WATERMARK LOGO SFUMATO */}
+      <div className="fixed inset-0 pointer-events-none z-0 flex items-center justify-center">
+        <img 
+          src="/logo.jpg" 
+          alt="" 
+          className="w-[900px] h-auto opacity-[0.30] blur-[2px]"
+        />
+      </div>
+      
+      {/* Contenuto sopra il watermark */}
+      <div className="relative z-10 flex flex-col min-h-screen">
+        <Navbar 
+          activeTab={activeTab} 
+          setTab={handleTabChange}
+          searchTerm={searchTerm} 
+          onSearch={setSearchTerm} 
+          onOpenSettings={() => setIsSettingsOpen(true)} 
+          config={config} 
+        />
 
-      <main className="max-w-7xl mx-auto px-4 py-8 w-full flex-grow">
-        {activeTab === 'dashboard' && (
-          <Dashboard 
-            stats={stats} 
-            onFilterStatus={handleFilterFromDashboard} 
-            onStartTest={handleSeedData} 
-            config={config} 
-          />
-        )}
-        {activeTab === 'new' && (
-          <OrderForm 
-            initialData={editingOrder} 
-            onSubmit={handleCreateOrUpdate} 
-            onCancel={() => { setActiveTab('dashboard'); setEditingOrder(null); }} 
-          />
-        )}
-        {activeTab === 'database' && (
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-               <h2 className="text-2xl font-black text-slate-800 tracking-tighter uppercase italic">
-                 DATABASE <span className="text-[#00adef]">ORDINI 2026</span>
-               </h2>
-               {currentFilter && (
-                 <button 
-                   onClick={() => setCurrentFilter(null)} 
-                   className="text-[10px] font-black text-[#00adef] uppercase tracking-widest flex items-center gap-2 border-2 border-[#00adef] px-4 py-1.5 rounded-2xl hover:bg-[#00adef] hover:text-white transition-all bg-white shadow-md"
-                 >
-                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
-                   </svg>
-                   Reset Filtro
-                 </button>
-               )}
-            </div>
-            <OrderTable 
-              orders={filteredOrders} 
-              onEdit={(o) => { setEditingOrder(o); setActiveTab('new'); }} 
-              onDelete={handleDelete} 
-              onPrint={setPrintingOrder} 
-              onEmailAction={(o) => setPendingEmailOrder({order: o})} 
-              onViewWorkflow={setViewingWorkflow} 
-              onToggleStatus={handleToggleManualStatus} 
+        <main className="max-w-7xl mx-auto px-4 py-8 w-full flex-grow">
+          {activeTab === 'dashboard' && (
+            <Dashboard 
+              stats={stats} 
+              onFilterStatus={handleFilterFromDashboard} 
+              onStartTest={handleSeedData} 
+              config={config} 
             />
+          )}
+          {activeTab === 'new' && (
+            <OrderForm 
+              initialData={editingOrder} 
+              onSubmit={handleCreateOrUpdate} 
+              onCancel={() => { setActiveTab('dashboard'); setEditingOrder(null); }} 
+            />
+          )}
+          {activeTab === 'database' && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                 <h2 className="text-2xl font-black text-slate-800 tracking-tighter uppercase italic">
+                   DATABASE <span className="text-[#00adef]">ORDINI 2026</span>
+                 </h2>
+                 {currentFilter && (
+                   <button 
+                     onClick={() => setCurrentFilter(null)} 
+                     className="text-[10px] font-black text-[#00adef] uppercase tracking-widest flex items-center gap-2 border-2 border-[#00adef] px-4 py-1.5 rounded-2xl hover:bg-[#00adef] hover:text-white transition-all bg-white shadow-md"
+                   >
+                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                     </svg>
+                     Reset Filtro
+                   </button>
+                 )}
+              </div>
+              <OrderTable 
+                orders={filteredOrders} 
+                onEdit={(o) => { setEditingOrder(o); setActiveTab('new'); }} 
+                onDelete={handleDelete} 
+                onPrint={setPrintingOrder} 
+                onEmailAction={(o) => setPendingEmailOrder({order: o})} 
+                onViewWorkflow={setViewingWorkflow} 
+                onToggleStatus={handleToggleManualStatus} 
+              />
+            </div>
+          )}
+        </main>
+
+        {toast && (
+          <div className={`fixed bottom-8 right-8 px-8 py-4 rounded-2xl shadow-2xl z-[100] animate-in slide-in-from-bottom-10 font-black uppercase tracking-widest text-[10px] flex items-center gap-3 border-2 ${
+            toast.type === 'success' ? 'bg-green-600 border-green-500 text-white' : 
+            toast.type === 'error' ? 'bg-red-600 border-red-500 text-white' :
+            'bg-slate-900 border-slate-700 text-white'
+          }`}>
+            <div className={`${
+              toast.type === 'success' ? 'bg-white text-green-600' : 
+              toast.type === 'error' ? 'bg-white text-red-600' :
+              'bg-[#00adef] text-white'
+            } rounded-full p-1`}>
+               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" />
+               </svg>
+            </div>
+            {toast.message}
           </div>
         )}
-      </main>
 
-      {toast && (
-        <div className={`fixed bottom-8 right-8 px-8 py-4 rounded-2xl shadow-2xl z-[100] animate-in slide-in-from-bottom-10 font-black uppercase tracking-widest text-[10px] flex items-center gap-3 border-2 ${
-          toast.type === 'success' ? 'bg-green-600 border-green-500 text-white' : 
-          toast.type === 'error' ? 'bg-red-600 border-red-500 text-white' :
-          'bg-slate-900 border-slate-700 text-white'
-        }`}>
-          <div className={`${
-            toast.type === 'success' ? 'bg-white text-green-600' : 
-            toast.type === 'error' ? 'bg-white text-red-600' :
-            'bg-[#00adef] text-white'
-          } rounded-full p-1`}>
-             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" />
-             </svg>
+        {isSettingsOpen && (
+          <SettingsModal 
+            onSave={handleSaveConfig} 
+            onClose={() => setIsSettingsOpen(false)} 
+            onSeed={handleSeedData} 
+          />
+        )}
+        {viewingWorkflow && (
+          <WorkflowModal 
+            order={viewingWorkflow} 
+            onUpdateWorkflow={handleUpdateWorkflow} 
+            onContinue={handleContinueWorkflow} 
+            onToggleStatus={handleToggleManualStatus} 
+            onClose={() => setViewingWorkflow(null)} 
+          />
+        )}
+        {printingOrder && (
+          <PrintModal 
+            order={printingOrder} 
+            onClose={() => setPrintingOrder(null)}
+            onPrint={handlePrintDocument}
+          />
+        )}
+        {pendingEmailOrder && (
+          <EmailModal 
+            order={pendingEmailOrder.order} 
+            forcedDocType={pendingEmailOrder.forcedDoc} 
+            onSend={handleSendEmail} 
+            onClose={() => setPendingEmailOrder(null)} 
+          />
+        )}
+
+        {isLoading && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex flex-col items-center justify-center text-white text-center">
+             <div className="w-16 h-16 border-4 border-[#00adef] border-t-transparent rounded-full animate-spin"></div>
+             <p className="mt-6 font-black uppercase tracking-widest text-xs">Sincronizzazione Cloud...</p>
           </div>
-          {toast.message}
-        </div>
-      )}
-
-      {isSettingsOpen && (
-        <SettingsModal 
-          onSave={handleSaveConfig} 
-          onClose={() => setIsSettingsOpen(false)} 
-          onSeed={handleSeedData} 
-        />
-      )}
-      {viewingWorkflow && (
-        <WorkflowModal 
-          order={viewingWorkflow} 
-          onUpdateWorkflow={handleUpdateWorkflow} 
-          onContinue={handleContinueWorkflow} 
-          onToggleStatus={handleToggleManualStatus} 
-          onClose={() => setViewingWorkflow(null)} 
-        />
-      )}
-      {printingOrder && (
-        <PrintModal 
-          order={printingOrder} 
-          onClose={() => setPrintingOrder(null)}
-          onPrint={handlePrintDocument}
-        />
-      )}
-      {pendingEmailOrder && (
-        <EmailModal 
-          order={pendingEmailOrder.order} 
-          forcedDocType={pendingEmailOrder.forcedDoc} 
-          onSend={handleSendEmail} 
-          onClose={() => setPendingEmailOrder(null)} 
-        />
-      )}
-
-      {isLoading && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex flex-col items-center justify-center text-white text-center">
-           <div className="w-16 h-16 border-4 border-[#00adef] border-t-transparent rounded-full animate-spin"></div>
-           <p className="mt-6 font-black uppercase tracking-widest text-xs">Sincronizzazione Cloud...</p>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Order, OrderStatus, getCurrentStep, canPerformAction } from '../types';
+import { Order, OrderStatus } from '../types';
 
 interface WorkflowModalProps {
   order: Order;
@@ -11,141 +11,130 @@ interface WorkflowModalProps {
 
 const WorkflowModal: React.FC<WorkflowModalProps> = ({ order, onUpdateWorkflow, onContinue, onClose, onToggleStatus }) => {
   
-  const currentStep = getCurrentStep(order.workflow);
   const isSospeso = order.status === OrderStatus.SOSPESO;
 
-  // Definizione dei 9 step
+  // ==========================================
+  // 🔥 FIX: Step con flag CORRETTI (no *Creato)
+  // ==========================================
   const steps = [
+    // CONTRATTO
     { 
       id: 1, 
-      label: 'Crea Contratto PDF', 
-      key: 'contrattoCreato',
-      type: 'action',
-      doc: 'contratto',
-      action: 'create_contratto',
-      icon: '📄'
-    },
-    { 
-      id: 2, 
       label: 'Invia Email Contratto', 
       key: 'contrattoInviato',
       type: 'action',
       doc: 'contratto',
-      action: 'send_contratto',
-      icon: '✉️'
+      icon: '✉️',
+      canDo: () => true  // Sempre disponibile
     },
     { 
-      id: 3, 
+      id: 2, 
       label: 'Contratto Accettato (FLAG)', 
       key: 'contrattoFirmato',
       type: 'flag',
-      icon: '✋'
+      icon: '✋',
+      canDo: () => order.workflow.contrattoInviato
     },
+    
+    // MANUALE
     { 
-      id: 4, 
-      label: 'Crea Manuale PDF', 
-      key: 'manualeCreato',
-      type: 'action',
-      doc: 'manuale',
-      action: 'create_manuale',
-      icon: '📖'
-    },
-    { 
-      id: 5, 
+      id: 3, 
       label: 'Invia Email Manuale', 
       key: 'manualeInviato',
       type: 'action',
       doc: 'manuale',
-      action: 'send_manuale',
-      icon: '✉️'
+      icon: '✉️',
+      canDo: () => order.workflow.contrattoFirmato
     },
     { 
-      id: 6, 
+      id: 4, 
       label: 'Manuale Letto e Controfirmato (FLAG)', 
       key: 'manualeFirmato',
       type: 'flag',
-      icon: '✋'
+      icon: '✋',
+      canDo: () => order.workflow.manualeInviato
     },
+    
+    // GARANZIA
     { 
-      id: 7, 
-      label: 'Crea Garanzia PDF', 
-      key: 'garanziaCreata',
-      type: 'action',
-      doc: 'garanzia',
-      action: 'create_garanzia',
-      icon: '🛡️'
-    },
-    { 
-      id: 8, 
+      id: 5, 
       label: 'Invia Email Garanzia', 
-      key: 'garanziaInviata',
+      key: 'garanziaRilasciata',
       type: 'action',
       doc: 'garanzia',
-      action: 'send_garanzia',
-      icon: '✉️'
+      icon: '✉️',
+      canDo: () => order.workflow.manualeFirmato
     },
+    
     { 
-      id: 9, 
+      id: 6, 
       label: 'Iter Terminato', 
       key: 'garanziaRilasciata',
       type: 'final',
-      icon: '✅'
+      icon: '✅',
+      canDo: () => order.workflow.garanziaRilasciata
     },
   ];
 
+  // Calcola step corrente
+  const getCurrentStepIndex = (): number => {
+    if (!order.workflow.contrattoInviato) return 0;
+    if (!order.workflow.contrattoFirmato) return 1;
+    if (!order.workflow.manualeInviato) return 2;
+    if (!order.workflow.manualeFirmato) return 3;
+    if (!order.workflow.garanziaRilasciata) return 4;
+    return 5; // Concluso
+  };
+
+  const currentStepIndex = getCurrentStepIndex();
+  const currentStep = steps[currentStepIndex];
+
   const handleNext = () => {
-    const step = steps[currentStep - 1];
+    if (!currentStep) return;
     
-    // Verifica se l'azione è permessa
-    if (step.action && !canPerformAction(order.workflow, step.action as any)) {
+    // Verifica permessi
+    if (!currentStep.canDo()) {
       alert('Completa prima gli step precedenti!');
       return;
     }
 
-    // Se è un'azione (crea documento o invia email)
-    if (step.type === 'action' && step.doc) {
-      onContinue(order, step.doc as any);
+    // Se è un'azione (invia email + genera PDF on-the-fly)
+    if (currentStep.type === 'action' && currentStep.doc) {
+      console.log('🔵 Aprendo modale email per:', currentStep.doc);
+      onContinue(order, currentStep.doc as any);
       return;
     }
 
     // Se è un FLAG manuale, aggiorna il workflow
-    if (step.type === 'flag' || step.type === 'final') {
-      const newWorkflow = { ...order.workflow, [step.key]: true };
-      
-      // Se è la garanzia inviata, marca anche rilasciata (automatico)
-      if (step.key === 'garanziaInviata') {
-        newWorkflow.garanziaRilasciata = true;
-      }
-      
+    if (currentStep.type === 'flag') {
+      console.log('🔵 Aggiornando flag:', currentStep.key);
+      const newWorkflow = { ...order.workflow, [currentStep.key]: true };
       onUpdateWorkflow(order.id, newWorkflow);
     }
   };
 
-  const getBlockedReason = (stepIndex: number): string | null => {
-    const step = steps[stepIndex];
-    if (!step.action) return null;
+  const getBlockedReason = (): string | null => {
+    if (!currentStep) return null;
+    if (currentStep.canDo()) return null;
     
-    if (!canPerformAction(order.workflow, step.action as any)) {
-      // Trova lo step precedente non completato
-      if (step.action === 'send_contratto' && !order.workflow.contrattoCreato) {
-        return 'Crea prima il contratto';
-      }
-      if (step.action === 'create_manuale' && !order.workflow.contrattoFirmato) {
-        return 'Attendi conferma contratto firmato';
-      }
-      if (step.action === 'send_manuale' && !order.workflow.manualeCreato) {
-        return 'Crea prima il manuale';
-      }
-      if (step.action === 'create_garanzia' && !order.workflow.manualeFirmato) {
-        return 'Attendi conferma manuale letto';
-      }
-      if (step.action === 'send_garanzia' && !order.workflow.garanziaCreata) {
-        return 'Crea prima la garanzia';
-      }
-      return 'Step precedente non completato';
+    // Messaggi specifici
+    if (currentStep.key === 'contrattoFirmato') {
+      return 'Invia prima email contratto';
     }
-    return null;
+    if (currentStep.key === 'manualeInviato') {
+      return 'Attendi conferma contratto firmato';
+    }
+    if (currentStep.key === 'manualeFirmato') {
+      return 'Invia prima email manuale';
+    }
+    if (currentStep.key === 'garanziaRilasciata') {
+      return 'Attendi conferma manuale letto';
+    }
+    
+    return 'Step precedente non completato';
   };
+
+  const blockedReason = getBlockedReason();
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
@@ -159,7 +148,7 @@ const WorkflowModal: React.FC<WorkflowModalProps> = ({ order, onUpdateWorkflow, 
             </div>
             <div>
                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter italic">ITER <span className="text-[#00adef]">SEQUENZIALE</span></h3>
-               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">{order.nomeAzienda} • Step {currentStep}/9</p>
+               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">{order.nomeAzienda} • Step {currentStepIndex + 1}/6</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
@@ -175,10 +164,9 @@ const WorkflowModal: React.FC<WorkflowModalProps> = ({ order, onUpdateWorkflow, 
             
             <div className="space-y-4">
               {steps.map((step, idx) => {
-                const isPast = idx < currentStep - 1;
-                const isCurrent = idx === currentStep - 1;
-                const isFuture = idx > currentStep - 1;
-                const blockedReason = isCurrent ? getBlockedReason(idx) : null;
+                const isPast = idx < currentStepIndex;
+                const isCurrent = idx === currentStepIndex;
+                const isFuture = idx > currentStepIndex;
 
                 return (
                   <div key={idx} className={`flex gap-6 items-start transition-all duration-500 ${isFuture ? 'opacity-30 grayscale' : 'opacity-100'}`}>
@@ -202,7 +190,7 @@ const WorkflowModal: React.FC<WorkflowModalProps> = ({ order, onUpdateWorkflow, 
                         {step.label}
                       </h4>
                       
-                      {isCurrent && step.type !== 'flag' && (
+                      {isCurrent && step.type === 'action' && (
                         <p className="text-[9px] font-bold text-[#00adef] uppercase mt-0.5 animate-pulse">
                           ⚡ Azione richiesta adesso
                         </p>
@@ -214,7 +202,7 @@ const WorkflowModal: React.FC<WorkflowModalProps> = ({ order, onUpdateWorkflow, 
                         </p>
                       )}
                       
-                      {blockedReason && (
+                      {isCurrent && blockedReason && (
                         <p className="text-[9px] font-bold text-red-600 uppercase mt-0.5 flex items-center gap-1">
                           🔒 {blockedReason}
                         </p>
@@ -250,23 +238,23 @@ const WorkflowModal: React.FC<WorkflowModalProps> = ({ order, onUpdateWorkflow, 
           </button>
 
           {/* Continua */}
-          {currentStep < 10 && !isSospeso && (
+          {currentStepIndex < 5 && !isSospeso && (
             <button 
               onClick={handleNext}
-              disabled={!!getBlockedReason(currentStep - 1)}
+              disabled={!!blockedReason}
               className={`flex-[2] px-6 py-4 text-[11px] font-black uppercase tracking-widest rounded-2xl shadow-xl transition-all flex items-center justify-center gap-3 group ${
-                getBlockedReason(currentStep - 1)
+                blockedReason
                   ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                   : 'bg-[#00adef] text-white shadow-[#00adef]/20 hover:scale-[1.02] active:scale-95'
               }`}
             >
-              <span>Continua Step {currentStep}</span>
+              <span>Continua Step {currentStepIndex + 1}</span>
               <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 5l7 7-7 7" /></svg>
             </button>
           )}
 
           {/* Concluso */}
-          {currentStep >= 10 && (
+          {currentStepIndex >= 5 && (
             <div className="flex-[2] px-6 py-4 bg-green-500 text-white text-[11px] font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-green-200 flex items-center justify-center gap-3">
               <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
               Iter Concluso ✅
