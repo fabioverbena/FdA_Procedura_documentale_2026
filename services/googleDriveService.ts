@@ -15,6 +15,17 @@ const DRIVE_CONFIG = {
 
 type DocumentType = 'contratto' | 'manuale' | 'garanzia';
 
+const getValidToken = (): string | null => {
+  const token = getToken();
+  
+  if (!token) {
+    console.error('[ERROR] getValidToken: token non disponibile o scaduto');
+    return null;
+  }
+
+  return token;
+};
+
 const findFolderByName = async (
   folderName: string,
   parentId: string,
@@ -80,7 +91,10 @@ const createFolder = async (
   }
 };
 
-export const getOrCreateClientFolder = async (nomeAzienda: string, piva?: string): Promise<string | null> => {
+export const getOrCreateClientFolder = async (
+  nomeAzienda: string, 
+  piva?: string
+): Promise<{ clientFolderId: string; firmatiFolderId: string } | null> => {
   const token = getToken();
   if (!token || !DRIVE_CONFIG.clientiFolderId) return null;
 
@@ -92,8 +106,16 @@ export const getOrCreateClientFolder = async (nomeAzienda: string, piva?: string
     if (!folderId) {
       folderId = await createFolder(folderName, DRIVE_CONFIG.clientiFolderId, token);
     }
+if (!folderId) {
+  folderId = await createFolder(folderName, DRIVE_CONFIG.clientiFolderId, token);
+}
 
-    return folderId;
+// NUOVO: Crea sottocartella Firmati
+let firmatiFolderId = await findFolderByName('Firmati', folderId, token);
+if (!firmatiFolderId) {
+  firmatiFolderId = await createFolder('Firmati', folderId, token);
+}
+return { clientFolderId: folderId, firmatiFolderId };
   } catch (error) {
     console.error('[ERROR] getOrCreateClientFolder:', error);
     return null;
@@ -206,6 +228,79 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
   });
 };
 
+export const uploadFileToDrive = async (
+  fileBlob: Blob,
+  fileName: string,
+  folderId: string
+): Promise<string | null> => {
+  try {
+    const token = getValidToken();
+    if (!token) {
+      console.error('[ERROR] uploadFileToDrive: token non valido');
+      return null;
+    }
+
+    const boundary = '-------drive_upload_' + Math.random().toString(36).slice(2);
+    const delimiter = `\r\n--${boundary}\r\n`;
+    const closeDelimiter = `\r\n--${boundary}--`;
+
+    const metadata = {
+      name: fileName,
+      parents: [folderId],
+      mimeType: 'application/pdf'
+    };
+
+    const body = new Blob(
+      [
+        delimiter,
+        'Content-Type: application/json; charset=UTF-8\r\n\r\n',
+        JSON.stringify(metadata),
+        delimiter,
+        'Content-Type: application/pdf\r\n\r\n',
+        fileBlob,
+        closeDelimiter
+      ],
+      { type: `multipart/related; boundary=${boundary}` }
+    );
+
+    console.log('[INFO] Upload file su Drive:', fileName, 'nella cartella:', folderId);
+
+    const response = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink,webContentLink',  // 🆕 Aggiungi webContentLink
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': `multipart/related; boundary=${boundary}`
+        },
+        body
+      }
+    );
+
+    if (!response.ok) {
+      let errorData: any = null;
+      try {
+        errorData = await response.json();
+      } catch {
+        // ignore json parse error
+      }
+
+      console.error('[ERROR] uploadFileToDrive response:', response.status, errorData);
+      return null;
+    }
+
+    const data = await response.json();
+    const downloadLink = data.webContentLink || data.webViewLink;  // 🆕 Usa webContentLink
+
+    console.log('[OK] File caricato su Drive. ID:', data.id, 'link:', downloadLink);
+
+    return downloadLink;
+  } catch (error) {
+    console.error('[ERROR] uploadFileToDrive:', error);
+    return null;
+  }
+};
+
 const prepareReplacements = (order: Order): Record<string, string> => {
   const formatDate = (date: string) => {
     if (!date) return '';
@@ -244,7 +339,7 @@ const getContractTypeName = (tipoContratto: string): string => {
   return 'CONTRATTO B2B';
 };
 
-export const generateAndPrintDocument = async (
+export const AndgeneratePrintDocument = async (
   order: Order,
   documentType: DocumentType
 ): Promise<{ base64: string; filename: string } | null> => {

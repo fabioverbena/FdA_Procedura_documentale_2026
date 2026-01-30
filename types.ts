@@ -37,28 +37,32 @@ export interface Order {
   dataInserimento: string;
   tipoContratto: ContractType;
   nomeAzienda: string;
-  rappresentanteLegale: string;
+  rappresentanteLegale?: string;  // ✅ Opzionale
   indirizzo: string;
   cap: string;
   citta: string;
+  provincia?: string;  // 🆕 AGGIUNGI
   piva: string;
-  emailContatto: string;
+  email?: string;      // 🆕 AGGIUNGI (era emailContatto?)
+  emailContatto?: string;
+  telefono?: string;   // 🆕 AGGIUNGI
   modello: ModelType;
   matricola: string;
   condizione: ConditionType;
   prezzo: number;
   status: OrderStatus;
+  
+  // 🆕 Campi Drive (fuori da workflow)
+  pdfUrl?: string;
+  clientFolderId?: string;
+  firmatiFolderId?: string;
+  
   workflow: {
-    // STEP 1-3: Contratto
-    contrattoInviato: boolean;     // STEP 2: Email inviata al cliente
-    contrattoFirmato: boolean;     // STEP 3: FLAG manuale - Cliente ha accettato
-    
-    // STEP 4-6: Manuale
-    manualeInviato: boolean;       // STEP 5: Email inviata al cliente
-    manualeFirmato: boolean;       // STEP 6: FLAG manuale - Cliente ha letto/controfirmato
-    
-    // STEP 7-9: Garanzia
-    garanziaRilasciata: boolean;   // STEP 9: Automatico (= garanziaInviata)
+    contrattoInviato: boolean;
+    contrattoFirmato: boolean;
+    manualeInviato: boolean;
+    manualeFirmato: boolean;
+    garanziaRilasciata: boolean;
   };
 }
 

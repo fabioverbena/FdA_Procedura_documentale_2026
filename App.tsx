@@ -2,23 +2,27 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Order, OrderStatus, DashboardStats, AppConfig } from './types';
 import { getOrders, saveOrder, deleteOrder, updateOrderStatus, getConfig, seedTestData, generateSafeId } from './services/googleService';
 import { handleOAuthCallback, isAuthenticated, sendEmail } from './services/googleAuth';
-import { generateAndPrintDocument } from './services/googleDriveService';
-import Navbar from './components/Navbar';
+import DocumentiProntiModal from './components/DocumentiProntiModal';
+import { AndgeneratePrintDocument, uploadFileToDrive, getOrCreateClientFolder } from './services/googleDriveService';import Navbar from './components/Navbar';
 import Dashboard from './components/Dashboard';
 import OrderForm from './components/OrderForm';
 import OrderTable from './components/OrderTable';
-import WorkflowModal from './components/WorkflowModal';
 import EmailModal from './components/EmailModal';
 import PrintModal from './components/PrintModal';
 import SettingsModal from './components/SettingsModal';
-
+import DocumentoYouSignModal from './components/DocumentoYouSignModal';
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'new' | 'database'>('dashboard');
   const [orders, setOrders] = useState<Order[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentFilter, setCurrentFilter] = useState<OrderStatus | 'TOTAL' | 'IN_CORSO_ONLY' | null>(null);
   const [config, setConfig] = useState<AppConfig>(getConfig());
-  
+  const [showDocumentiModal, setShowDocumentiModal] = useState(false);
+  // Stati per modal documento YouSign
+const [showDocumentoModal, setShowDocumentoModal] = useState(false);
+const [documentoCorrente, setDocumentoCorrente] = useState<any>(null);
+const [documentiPronti, setDocumentiPronti] = useState<any>(null);
+const [isGeneratingDocs, setIsGeneratingDocs] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [viewingWorkflow, setViewingWorkflow] = useState<Order | null>(null);
   const [printingOrder, setPrintingOrder] = useState<Order | null>(null);
@@ -41,12 +45,25 @@ const App: React.FC = () => {
     }
     
     loadOrders();
+    
+    // 🆕 POLLING: Ricarica ordini ogni 30 secondi
+    const intervalId = setInterval(() => {
+      console.log('🔄 Auto-refresh ordini (30 sec)');
+      loadOrders();
+    }, 30000);
+    
+    // Cleanup quando componente si smonta
+    return () => clearInterval(intervalId);
   }, []);
-
+  
   useEffect(() => {
-    loadOrders();
+    // 🆕 Refresh quando torni alla tab database
+    if (activeTab === 'database') {
+      console.log('🔄 Refresh ordini (cambio tab)');
+      loadOrders();
+    }
   }, [activeTab]);
-
+  
   const loadOrders = async () => {
     try {
       const data = await getOrders();
@@ -62,7 +79,7 @@ const App: React.FC = () => {
       total: orders.length,
       sospesi: orders.filter(o => o.status === OrderStatus.SOSPESO).length,
       conclusi: orders.filter(o => o.status === OrderStatus.CONCLUSO).length,
-      inCorso: orders.filter(o => o.status === OrderStatus.IN_CORSO).length,
+      inCorso: orders.filter(o => o.status !== 'Iter Concluso').length,
     };
   }, [orders]);
 
@@ -70,7 +87,8 @@ const App: React.FC = () => {
     let result = [...orders];
     
     if (currentFilter === 'IN_CORSO_ONLY') {
-      result = result.filter(o => o.status === OrderStatus.IN_CORSO);
+      // Mostra TUTTI tranne "Iter concluso"
+      result = result.filter(o => o.status !== 'Iter Concluso');
     } else if (currentFilter && currentFilter !== 'TOTAL') {
       result = result.filter(o => o.status === currentFilter);
     }
@@ -234,7 +252,91 @@ const App: React.FC = () => {
       }
     }
   };
-
+  const handleContinuaProcedura = async (order: Order) => {
+    const cleanPIVA = order.piva.replace(/\s/g, '');
+    
+    setIsGeneratingDocs(true);
+    
+    try {
+      console.log('🔄 Generazione Manuale in corso...');
+      
+      // Se la cartella non esiste, creala ora
+      let clientFolderId = order.clientFolderId;
+      
+      if (!clientFolderId) {
+        console.log('📁 Cartella non trovata, la creo ora...');
+        const folders = await getOrCreateClientFolder(
+          order.nomeAzienda,
+          order.piva
+        );
+        
+        if (!folders) {
+          alert('❌ Errore durante la creazione delle cartelle su Drive');
+          return;
+        }
+        
+        clientFolderId = folders.clientFolderId;
+        console.log('✅ Cartelle create:', folders);
+        
+        // SALVA l'ID cartella nell'ordine
+        order.clientFolderId = folders.clientFolderId;
+        order.firmatiFolderId = folders.firmatiFolderId;
+        
+        // AGGIORNA nel database
+        await saveOrder(order);
+        console.log('💾 ID cartelle salvati nell\'ordine');
+        
+        // RICARICA ordini per aggiornare la UI
+        const updatedOrders = await getOrders();
+        setOrders(updatedOrders);
+      }
+      
+      // 1. GENERA MANUALE
+      const manualeResult = await AndgeneratePrintDocument(order, 'manuale');
+      
+      if (!manualeResult) {
+        throw new Error('Errore generazione Manuale');
+      }
+      
+      const manualeBlob = await fetch(`data:application/pdf;base64,${manualeResult.base64}`)
+        .then(r => r.blob());
+      
+      const manualeFilename = `Manuale CE - ${cleanPIVA}.pdf`;
+      const manualeUrl = await uploadFileToDrive(
+        manualeBlob,
+        manualeFilename,
+        clientFolderId
+      );
+      
+      if (!manualeUrl) {
+        throw new Error('Errore salvataggio Manuale su Drive');
+      }
+      
+      console.log('✅ Manuale generato:', manualeUrl);
+      
+      // 2. PREPARA MANUALE PER MODAL
+      setDocumentoCorrente({
+        tipo: 'Manuale CE',
+        url: manualeUrl,
+        filename: manualeFilename,
+        cliente: order.nomeAzienda,
+        firmatario: order.rappresentanteLegale || order.nomeAzienda,  // ✅ CORRETTO
+        email: order.email || '',
+        cellulare: order.telefono || ''
+      });
+      
+      // 3. APRI MODAL
+      setShowDocumentoModal(true);
+      
+      alert('✅ Manuale generato con successo!');
+      
+    } catch (error) {
+      console.error('❌ Errore durante generazione Manuale:', error);
+      alert(`❌ Errore: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`);
+    } finally {
+      setIsGeneratingDocs(false);
+    }
+  };
   const handleTabChange = (tab: 'dashboard' | 'new' | 'database') => {
     if (tab === 'new' && editingOrder !== null) {
       console.log('🔵 Reset editingOrder per nuovo ordine');
@@ -386,7 +488,38 @@ const App: React.FC = () => {
     setIsLoading(false);
   }
 };
-
+const handleSubmit = async (order: Partial<Order>, source: 'manual' | 'yousign') => {
+  try {
+    if (editingOrder) {
+      // Modifica ordine esistente
+      const updatedOrder = { ...editingOrder, ...order };
+      await saveOrder(updatedOrder);
+      showToast('✅ Ordine aggiornato!', 'success');
+    } else {
+      // Nuovo ordine
+      const newOrder = {
+        ...order,
+        id: generateSafeId(),
+        dataInserimento: new Date().toISOString(),
+        status: source === 'yousign' ? 'In attesa firma' : OrderStatus.IN_CORSO
+      } as Order;
+      await saveOrder(newOrder);
+      showToast('✅ Ordine creato!', 'success');
+    }
+    
+    // Ricarica ordini
+    const updatedOrders = await getOrders();
+    setOrders(updatedOrders);
+    
+    // Chiudi form e torna al database
+    setEditingOrder(null);
+    setActiveTab('database');
+    
+  } catch (error) {
+    console.error('❌ Errore salvataggio ordine:', error);
+    showToast('❌ Errore durante il salvataggio', 'error');
+  }
+};
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col relative">
       {/* 🎨 WATERMARK LOGO SFUMATO */}
@@ -419,11 +552,15 @@ const App: React.FC = () => {
             />
           )}
           {activeTab === 'new' && (
-            <OrderForm 
-              initialData={editingOrder} 
-              onSubmit={handleCreateOrUpdate} 
-              onCancel={() => { setActiveTab('dashboard'); setEditingOrder(null); }} 
-            />
+           <OrderForm
+           initialData={editingOrder || undefined}
+           onSubmit={handleSubmit}
+           onCancel={() => { setEditingOrder(null); setActiveTab('database'); }}
+           onDocumentoReady={(doc) => {
+             setDocumentoCorrente(doc);
+             setShowDocumentoModal(true);
+           }}
+         />
           )}
           {activeTab === 'database' && (
             <div className="space-y-4">
@@ -451,6 +588,8 @@ const App: React.FC = () => {
                 onEmailAction={(o) => setPendingEmailOrder({order: o})} 
                 onViewWorkflow={setViewingWorkflow} 
                 onToggleStatus={handleToggleManualStatus} 
+                onContinuaProcedura={handleContinuaProcedura}  
+                isGeneratingDocs={isGeneratingDocs}  
               />
             </div>
           )}
@@ -482,15 +621,6 @@ const App: React.FC = () => {
             onSeed={handleSeedData} 
           />
         )}
-        {viewingWorkflow && (
-          <WorkflowModal 
-            order={viewingWorkflow} 
-            onUpdateWorkflow={handleUpdateWorkflow} 
-            onContinue={handleContinueWorkflow} 
-            onToggleStatus={handleToggleManualStatus} 
-            onClose={() => setViewingWorkflow(null)} 
-          />
-        )}
         {printingOrder && (
           <PrintModal 
             order={printingOrder} 
@@ -514,6 +644,22 @@ const App: React.FC = () => {
           </div>
         )}
       </div>
+      {/* Vecchio modal (da rimuovere dopo test) */}
+{/* <DocumentiProntiModal
+  show={showDocumentiModal}
+  onClose={() => setShowDocumentiModal(false)}
+  documenti={documentiPronti}
+/> */}
+
+{/* Nuovo modal */}
+<DocumentoYouSignModal
+  show={showDocumentoModal}
+  onClose={() => {
+    setShowDocumentoModal(false);
+    setDocumentoCorrente(null);
+  }}
+  documento={documentoCorrente}
+/>
     </div>
   );
 };

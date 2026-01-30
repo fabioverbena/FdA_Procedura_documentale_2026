@@ -8,11 +8,21 @@ interface OrderTableProps {
   onDelete: (id: string) => void;
   onPrint: (order: Order) => void;
   onEmailAction: (order: Order) => void;
-  onViewWorkflow: (order: Order) => void;
   onToggleStatus: (id: string, current: OrderStatus) => void;
+  onContinuaProcedura: (order: Order) => void;
+  isGeneratingDocs: boolean;
 }
 
-const OrderTable: React.FC<OrderTableProps> = ({ orders, onEdit, onDelete, onPrint, onEmailAction, onViewWorkflow, onToggleStatus }) => {
+const OrderTable: React.FC<OrderTableProps> = ({ 
+  orders, 
+  onEdit, 
+  onDelete, 
+  onPrint, 
+  onEmailAction, 
+  onToggleStatus,
+  onContinuaProcedura,
+  isGeneratingDocs
+}) => {
   const getStatusColor = (status: OrderStatus) => {
     switch(status) {
       case OrderStatus.SOSPESO: return 'bg-yellow-100 text-yellow-800 border-yellow-300 shadow-yellow-100/50';
@@ -21,7 +31,6 @@ const OrderTable: React.FC<OrderTableProps> = ({ orders, onEdit, onDelete, onPri
       default: return 'bg-slate-100 text-slate-800';
     }
   };
-
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       <div className="overflow-x-auto">
@@ -68,6 +77,7 @@ const OrderTable: React.FC<OrderTableProps> = ({ orders, onEdit, onDelete, onPri
                     </div>
                   </td>
                   <td className="px-6 py-4">
+                 
                     <button 
                       onClick={(e) => { e.stopPropagation(); onViewWorkflow(order); }}
                       className={`px-3 py-1.5 rounded-xl text-[10px] font-black border uppercase tracking-widest ${getStatusColor(order.status)} transition-all active:scale-95 flex items-center gap-2 shadow-sm`}
@@ -79,7 +89,7 @@ const OrderTable: React.FC<OrderTableProps> = ({ orders, onEdit, onDelete, onPri
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => onPrint(order)} className="p-2 text-slate-400 hover:text-slate-900 hover:bg-white rounded-xl shadow-sm border border-transparent hover:border-slate-200 transition-all" title="Stampa">
+                      td className<button onClick={() => onPrint(order)} className="p-2 text-slate-400 hover:text-slate-900 hover:bg-white rounded-xl shadow-sm border border-transparent hover:border-slate-200 transition-all" title="Stampa">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
                       </button>
                       <button onClick={() => onEmailAction(order)} className="p-2 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Email">
@@ -88,6 +98,24 @@ const OrderTable: React.FC<OrderTableProps> = ({ orders, onEdit, onDelete, onPri
                       <button onClick={() => onEdit(order)} className="p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="Modifica">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                       </button>
+                      {(order.status === 'TRUE' || order.status === 'Firmato') && (
+      <button
+        onClick={() => onContinuaProcedura(order)}
+        disabled={isGeneratingDocs}
+        className="p-2 text-green-400 hover:text-green-600 hover:bg-green-50 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        title={isGeneratingDocs ? "Generazione in corso..." : "Continua Procedura"}
+      >
+        {isGeneratingDocs ? (
+          <span className="animate-spin text-lg">⏳</span>
+        ) : (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        )}
+      </button>
+    )}
+    
+    
                       <div className="w-px h-4 bg-slate-200 mx-1"></div>
                       <button 
                         onClick={(e) => { e.stopPropagation(); if(confirm('ATTENZIONE: Eliminare definitivamente questo record?')) onDelete(order.id); }}

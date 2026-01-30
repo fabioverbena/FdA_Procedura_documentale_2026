@@ -60,26 +60,31 @@ export const getDirectLogoUrl = (url?: string): string => {
 // ==========================================
 const orderToRow = (order: Order): any[] => {
   return [
-    order.id,
-    order.dataInserimento,
-    order.tipoContratto,
-    order.nomeAzienda,
-    order.rappresentanteLegale,
-    order.indirizzo,
-    order.cap,
-    order.citta,
-    order.piva,
-    order.emailContatto,
-    order.modello,
-    order.matricola,
-    order.condizione,
-    order.prezzo,
-    order.status,
-    order.workflow.contrattoInviato ? 'TRUE' : 'FALSE',
-    order.workflow.contrattoFirmato ? 'TRUE' : 'FALSE',
-    order.workflow.manualeInviato ? 'TRUE' : 'FALSE',
-    order.workflow.manualeFirmato ? 'TRUE' : 'FALSE',
-    order.workflow.garanziaRilasciata ? 'TRUE' : 'FALSE'
+    order.id,                      // A (0)
+    order.dataInserimento,         // B (1)
+    order.tipoContratto,           // C (2)
+    order.nomeAzienda,             // D (3)
+    order.rappresentanteLegale || '', // E (4)
+    order.indirizzo,               // F (5)
+    order.cap,                     // G (6)
+    order.citta,                   // H (7)
+    order.provincia || '',         // I (8) 🆕
+    order.piva,                    // J (9)
+    order.email || order.emailContatto || '', // K (10)
+    order.telefono || '',          // L (11) 🆕
+    order.modello,                 // M (12)
+    order.matricola,               // N (13)
+    order.condizione,              // O (14)
+    order.prezzo,                  // P (15)
+    order.status,                  // Q (16)
+    order.pdfUrl || '',            // R (17) 🆕
+    order.clientFolderId || '',    // S (18) 🆕
+    order.firmatiFolderId || '',   // T (19) 🆕
+    order.workflow?.contrattoInviato || false,  // U (20)
+    order.workflow?.contrattoFirmato || false,  // V (21)
+    order.workflow?.manualeInviato || false,    // W (22)
+    order.workflow?.manualeFirmato || false,    // X (23)
+    order.workflow?.garanziaRilasciata || false // Y (24)
   ];
 };
 
@@ -93,19 +98,25 @@ const rowToOrder = (row: any[]): Order => {
     indirizzo: row[5] || '',
     cap: row[6] || '',
     citta: row[7] || '',
-    piva: row[8] || '',
-    emailContatto: row[9] || '',
-    modello: row[10] as ModelType || ModelType.LEO2,
-    matricola: row[11] || '',
-    condizione: row[12] as ConditionType || ConditionType.NUOVO,
-    prezzo: parseFloat(row[13]) || 0,
-    status: row[14] as OrderStatus || OrderStatus.IN_CORSO,
+    provincia: row[8] || '',  // 🆕 AGGIUNGI (colonna I)
+    piva: row[9] || '',        // ✅ Spostato da 8 a 9
+    email: row[10] || '',      // 🆕 AGGIUNGI (colonna K)
+    emailContatto: row[10] || '',  // Oppure row[11] se sono 2 email diverse
+    telefono: row[11] || '',   // 🆕 AGGIUNGI (colonna L)
+    modello: row[12] as ModelType || ModelType.LEO2,
+    matricola: row[13] || '',
+    condizione: row[14] as ConditionType || ConditionType.NUOVO,
+    prezzo: parseFloat(row[15]) || 0,
+    status: row[16] as OrderStatus || OrderStatus.IN_CORSO,  // ✅ Colonna Q (index 16)
+    pdfUrl: row[17] || '',           // 🆕 Colonna R
+    clientFolderId: row[18] || '',   // 🆕 Colonna S
+    firmatiFolderId: row[19] || '',  // 🆕 Colonna T
     workflow: {
-      contrattoInviato: row[15] === 'TRUE',
-      contrattoFirmato: row[16] === 'TRUE',
-      manualeInviato: row[17] === 'TRUE',
-      manualeFirmato: row[18] === 'TRUE',
-      garanziaRilasciata: row[19] === 'TRUE'
+      contrattoInviato: row[20] === 'TRUE' || row[20] === true,  // ✅ Colonna U
+      contrattoFirmato: row[21] === 'TRUE' || row[21] === true,  // ✅ Colonna V
+      manualeInviato: row[22] === 'TRUE' || row[22] === true,    // ✅ Colonna W
+      manualeFirmato: row[23] === 'TRUE' || row[23] === true,    // ✅ Colonna X
+      garanziaRilasciata: row[24] === 'TRUE' || row[24] === true // ✅ Colonna Y
     }
   };
 };
@@ -150,7 +161,7 @@ export const getOrders = async (): Promise<Order[]> => {
 
   try {
     const data = await callSheetsAPI(
-      `${config.spreadsheetId}/values/A2:T?valueRenderOption=UNFORMATTED_VALUE`
+      `${config.spreadsheetId}/values/A2:Y?valueRenderOption=UNFORMATTED_VALUE`  // ✅
     );
 
     if (!data.values || data.values.length === 0) {
@@ -181,18 +192,16 @@ export const saveOrder = async (order: Order): Promise<void> => {
       // UPDATE: Aggiorna riga esistente
       const rowNumber = existingIndex + 2; // +2 perché: riga 1 = header, array inizia da 0
       await callSheetsAPI(
-        `${config.spreadsheetId}/values/A${rowNumber}:T${rowNumber}?valueInputOption=RAW`,
+        `${config.spreadsheetId}/values/A${rowNumber}:Y${rowNumber}?valueInputOption=RAW`,  // ✅
         {
           method: 'PUT',
-          body: JSON.stringify({
-            values: [orderToRow(order)]
-          })
+          body: JSON.stringify({ values: [orderToRow(order)] })
         }
       );
     } else {
       // INSERT: Aggiungi nuova riga
       await callSheetsAPI(
-        `${config.spreadsheetId}/values/A:T:append?valueInputOption=RAW`,
+        `${config.spreadsheetId}/values/A:Y:append?valueInputOption=RAW`,
         {
           method: 'POST',
           body: JSON.stringify({
