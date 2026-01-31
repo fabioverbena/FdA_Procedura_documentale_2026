@@ -74,7 +74,33 @@ useEffect(() => {
       loadOrders();
     }
   }, [activeTab]);
+// Dopo gli altri useEffect (circa riga 50-80)
+
+// Auto-completa iter quando garanzia firmata
+useEffect(() => {
+  const checkIterConcluso = async () => {
+    const ordiniDaCompletare = orders.filter(
+      order => order.status === 'Garanzia firmata' && order.workflow?.garanziaRilasciata
+    );
+    
+    if (ordiniDaCompletare.length > 0) {
+      console.log(`🎉 ${ordiniDaCompletare.length} ordini da completare automaticamente`);
+      
+      for (const order of ordiniDaCompletare) {
+        const updatedOrder = {
+          ...order,
+          status: 'Iter concluso' as OrderStatus
+        };
+        await saveOrder(updatedOrder);
+        console.log(`✅ Ordine ${order.id} → Iter concluso`);
+      }
+      
+      await loadOrders();
+    }
+  };
   
+  checkIterConcluso();
+}, [orders]);  
   const loadOrders = async () => {
     try {
       const data = await getOrders();
@@ -89,8 +115,8 @@ useEffect(() => {
     return {
       total: orders.length,
       sospesi: orders.filter(o => o.status === OrderStatus.SOSPESO).length,
-      conclusi: orders.filter(o => o.status === OrderStatus.CONCLUSO).length,
-      inCorso: orders.filter(o => o.status !== 'Iter Concluso').length,
+      conclusi: orders.filter(o => o.status === 'Iter concluso').length,  // ✅ Fix maiuscola
+    inCorso: orders.filter(o => o.status !== 'Iter concluso').length,   // ✅ Fix maiuscola
     };
   }, [orders]);
 
@@ -99,7 +125,7 @@ useEffect(() => {
     
     if (currentFilter === 'IN_CORSO_ONLY') {
       // Mostra TUTTI tranne "Iter concluso"
-      result = result.filter(o => o.status !== 'Iter Concluso');
+      result = result.filter(o => o.status !== 'Iter concluso');
     } else if (currentFilter && currentFilter !== 'TOTAL') {
       result = result.filter(o => o.status === currentFilter);
     }

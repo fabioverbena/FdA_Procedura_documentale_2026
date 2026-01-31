@@ -176,16 +176,28 @@ const DocumentoYouSignModal: React.FC<DocumentoYouSignModalProps> = ({
   </div>
 </div>
 </div>
-{/* Alert Normativa CE - SOLO per Manuale */}
+{/* Warning Manuale CE - Testo copiabile */}
 {documento.tipo === 'Manuale CE' && (
-  <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 mb-4">
-    <div className="flex items-center gap-2">
-      <span className="text-lg">💡</span>
-      <p className="text-sm text-yellow-900">
-        <strong>Ricorda:</strong> Su YouSign aggiungi una nota nel campo "Testo libero" 
-        riguardo alla conferma "Letto e compreso"
-      </p>
+  <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4 mb-4">
+    <p className="text-sm font-bold text-yellow-900 mb-3">
+      ⚠️ Testo da inserire nel campo "Messaggio personalizzato" su YouSign:
+    </p>
+    <div className="bg-white p-4 rounded border border-yellow-300 text-sm text-gray-800 mb-3 whitespace-pre-line">
+      ⚠️ ATTENZIONE:
+
+La mancata firma del presente Manuale CE entro 15 giorni comporterà il decadimento automatico della garanzia di conformità.
+
+La firma è necessaria per confermare la presa visione delle istruzioni operative e delle condizioni di garanzia dell'attrezzatura.
     </div>
+    <button
+      onClick={() => copyToClipboard(
+        "⚠️ ATTENZIONE:\n\nLa mancata firma del presente Manuale CE entro 15 giorni comporterà il decadimento automatico della garanzia di conformità.\n\nLa firma è necessaria per confermare la presa visione delle istruzioni operative e delle condizioni di garanzia dell'attrezzatura.",
+        'Testo warning'
+      )}
+      className="w-full px-4 py-2.5 bg-yellow-500 text-white rounded-lg font-bold hover:bg-yellow-600 transition shadow-lg"
+    >
+      📋 COPIA TESTO WARNING
+    </button>
   </div>
 )}
         {/* Sezione YouSign */}

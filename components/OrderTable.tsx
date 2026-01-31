@@ -96,21 +96,26 @@ const OrderTable: React.FC<OrderTableProps> = ({
                       <button onClick={() => onEdit(order)} className="p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="Modifica">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                       </button>
-                      {(order.status === 'Contratto firmato' || order.status === 'Manuale firmato') && (      <button
-        onClick={() => onContinuaProcedura(order)}
-        disabled={isGeneratingDocs}
-        className="p-2 text-green-400 hover:text-green-600 hover:bg-green-50 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-        title={isGeneratingDocs ? "Generazione in corso..." : "Continua Procedura"}
-      >
-        {isGeneratingDocs ? (
-          <span className="animate-spin text-lg">⏳</span>
-        ) : (
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-        )}
-      </button>
+                      {(order.status === 'Contratto firmato' || order.status === 'Manuale firmato') && (
+  <button
+    onClick={() => onContinuaProcedura(order)}
+    disabled={isGeneratingDocs}
+    className="px-4 py-2.5 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg font-bold hover:from-green-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm border-2 border-green-400"
+    title={isGeneratingDocs ? "Generazione in corso..." : "Continua Procedura"}
+  >
+    {isGeneratingDocs ? (
+      <>
+        <span className="animate-spin text-lg">⏳</span>
+        <span>GENERAZIONE...</span>
+      </>
+    ) : (
+      <>
+        <span className="text-lg">{order.status === 'Manuale firmato' ? '📜' : '📘'}</span>
+        <span>{order.status === 'Manuale firmato' ? 'INVIA GARANZIA' : 'INVIA MANUALE'}</span>
+      </>
     )}
+  </button>
+)}
     
     
                       <div className="w-px h-4 bg-slate-200 mx-1"></div>

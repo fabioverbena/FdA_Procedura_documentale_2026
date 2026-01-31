@@ -65,6 +65,7 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onFilterStatus, onStartTes
               Gestione documentale e flussi automatizzati per il 2026. Sincronizzazione Drive/Sheets attiva.
             </p>
             <div className="mt-8">
+              {/* BOTTONE TEST - Commentato per produzione
                <button 
                   onClick={onStartTest} 
                   className="px-10 py-4 bg-[#00adef] text-white font-black rounded-2xl shadow-lg shadow-[#00adef]/20 hover:scale-105 active:scale-95 transition-all text-xs uppercase tracking-widest flex items-center gap-3 border-2 border-transparent hover:border-white/20"
@@ -72,6 +73,7 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onFilterStatus, onStartTes
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
                   Genera 10 Record di Test
                </button>
+               */}
             </div>
           </div>
         </div>
