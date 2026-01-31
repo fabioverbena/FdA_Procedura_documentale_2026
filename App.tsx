@@ -30,7 +30,18 @@ const [isGeneratingDocs, setIsGeneratingDocs] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
-
+// Carica ordini all'avvio + polling automatico
+useEffect(() => {
+  loadOrders();
+  
+  // Polling ogni 30 secondi
+  const intervalId = setInterval(() => {
+    console.log('🔄 Auto-refresh ordini');
+    loadOrders();
+  }, 30000);
+  
+  return () => clearInterval(intervalId);
+}, []);
   useEffect(() => {
     const urlHasToken = window.location.hash.includes('access_token');
     
@@ -258,7 +269,12 @@ const [isGeneratingDocs, setIsGeneratingDocs] = useState(false);
     setIsGeneratingDocs(true);
     
     try {
-      console.log('🔄 Generazione Manuale in corso...');
+      // Determina quale documento generare
+      const docType = order.status === 'Manuale firmato' ? 'garanzia' : 'manuale';
+      const docLabel = docType === 'garanzia' ? 'Garanzia' : 'Manuale';
+      const newStatus = docType === 'garanzia' ? 'Garanzia inviata' : 'Manuale inviato';
+      
+      console.log(`🔄 Generazione ${docLabel} in corso...`);
       
       // Se la cartella non esiste, creala ora
       let clientFolderId = order.clientFolderId;
@@ -291,47 +307,63 @@ const [isGeneratingDocs, setIsGeneratingDocs] = useState(false);
         setOrders(updatedOrders);
       }
       
-      // 1. GENERA MANUALE
-      const manualeResult = await AndgeneratePrintDocument(order, 'manuale');
+      // GENERA DOCUMENTO
+      const documentResult = await AndgeneratePrintDocument(order, docType);
       
-      if (!manualeResult) {
-        throw new Error('Errore generazione Manuale');
+      if (!documentResult) {
+        throw new Error(`Errore generazione ${docLabel}`);
       }
       
-      const manualeBlob = await fetch(`data:application/pdf;base64,${manualeResult.base64}`)
+      const documentBlob = await fetch(`data:application/pdf;base64,${documentResult.base64}`)
         .then(r => r.blob());
       
-      const manualeFilename = `Manuale CE - ${cleanPIVA}.pdf`;
-      const manualeUrl = await uploadFileToDrive(
-        manualeBlob,
-        manualeFilename,
+      const documentFilename = `${docLabel} CE - ${cleanPIVA}.pdf`;
+      const documentUrl = await uploadFileToDrive(
+        documentBlob,
+        documentFilename,
         clientFolderId
       );
       
-      if (!manualeUrl) {
-        throw new Error('Errore salvataggio Manuale su Drive');
+      if (!documentUrl) {
+        throw new Error(`Errore salvataggio ${docLabel} su Drive`);
       }
       
-      console.log('✅ Manuale generato:', manualeUrl);
+      console.log(`✅ ${docLabel} generato:`, documentUrl);
       
-      // 2. PREPARA MANUALE PER MODAL
+      // AGGIORNA STATUS ORDINE
+      const updatedOrder = {
+        ...order,
+        status: newStatus as OrderStatus,
+        workflow: {
+          ...order.workflow,
+          manualeInviato: docType === 'manuale' ? true : order.workflow.manualeInviato,
+          garanziaRilasciata: docType === 'garanzia' ? true : order.workflow.garanziaRilasciata
+        }
+      };
+      
+      await saveOrder(updatedOrder);
+      await loadOrders();
+      
+      console.log(`💾 Status aggiornato a "${newStatus}"`);
+      
+      // PREPARA DOCUMENTO PER MODAL
       setDocumentoCorrente({
-        tipo: 'Manuale CE',
-        url: manualeUrl,
-        filename: manualeFilename,
+        tipo: `${docLabel} CE`,
+        url: documentUrl,
+        filename: documentFilename,
         cliente: order.nomeAzienda,
-        firmatario: order.rappresentanteLegale || order.nomeAzienda,  // ✅ CORRETTO
+        firmatario: order.rappresentanteLegale || order.nomeAzienda,
         email: order.email || '',
         cellulare: order.telefono || ''
       });
       
-      // 3. APRI MODAL
+      // APRI MODAL
       setShowDocumentoModal(true);
       
-      alert('✅ Manuale generato con successo!');
+      alert(`✅ ${docLabel} generato con successo!`);
       
     } catch (error) {
-      console.error('❌ Errore durante generazione Manuale:', error);
+      console.error('❌ Errore durante generazione documento:', error);
       alert(`❌ Errore: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`);
     } finally {
       setIsGeneratingDocs(false);
@@ -660,6 +692,22 @@ const handleSubmit = async (order: Partial<Order>, source: 'manual' | 'yousign')
   }}
   documento={documentoCorrente}
 />
+{/* Loading Overlay - Generazione Documenti */}
+{isGeneratingDocs && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="bg-white rounded-lg p-8 shadow-2xl flex flex-col items-center gap-4 max-w-md">
+      <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-green-600"></div>
+      <div className="text-center">
+        <h3 className="text-lg font-bold text-gray-800 mb-2">
+          📄 Generazione documento...
+        </h3>
+        <p className="text-sm text-gray-600">
+          Attendere qualche secondo
+        </p>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 };

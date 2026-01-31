@@ -78,14 +78,12 @@ const OrderTable: React.FC<OrderTableProps> = ({
                   </td>
                   <td className="px-6 py-4">
                  
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); onViewWorkflow(order); }}
-                      className={`px-3 py-1.5 rounded-xl text-[10px] font-black border uppercase tracking-widest ${getStatusColor(order.status)} transition-all active:scale-95 flex items-center gap-2 shadow-sm`}
-                      title="Gestisci Iter e Azioni"
-                    >
-                      {order.status}
-                      <svg className="w-3 h-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
-                    </button>
+                  <button 
+  className={`px-3 py-1.5 rounded-xl text-[10px] font-black border uppercase tracking-widest ${getStatusColor(order.status)} transition-all flex items-center gap-2 shadow-sm cursor-default`}
+  title={order.status}
+>
+  {order.status}
+</button>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -98,8 +96,7 @@ const OrderTable: React.FC<OrderTableProps> = ({
                       <button onClick={() => onEdit(order)} className="p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="Modifica">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                       </button>
-                      {(order.status === 'TRUE' || order.status === 'Firmato') && (
-      <button
+                      {(order.status === 'Contratto firmato' || order.status === 'Manuale firmato') && (      <button
         onClick={() => onContinuaProcedura(order)}
         disabled={isGeneratingDocs}
         className="p-2 text-green-400 hover:text-green-600 hover:bg-green-50 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
