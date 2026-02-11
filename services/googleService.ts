@@ -27,7 +27,13 @@ export const generateSafeId = () => {
 export const getConfig = (): AppConfig => {
   try {
     const data = localStorage.getItem(CONFIG_KEY);
-    return data ? JSON.parse(data) : DEFAULT_CONFIG;
+    const stored = data ? (JSON.parse(data) as Partial<AppConfig>) : {};
+
+    return {
+      ...DEFAULT_CONFIG,
+      ...stored,
+      spreadsheetId: (stored.spreadsheetId || '').trim() || DEFAULT_CONFIG.spreadsheetId
+    };
   } catch (e) {
     return DEFAULT_CONFIG;
   }
