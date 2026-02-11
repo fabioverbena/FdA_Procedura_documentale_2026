@@ -21,6 +21,7 @@ const GOOGLE_CONFIG = {
 
 const TOKEN_KEY = 'google_oauth_token';
 const TOKEN_EXPIRY_KEY = 'google_oauth_expiry';
+const LAST_LOGIN_AT_KEY = 'google_oauth_last_login_at';
 
 // ==========================================
 // GESTIONE TOKEN
@@ -53,6 +54,7 @@ export const getToken = (): string | null => {
 export const clearToken = () => {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(TOKEN_EXPIRY_KEY);
+  localStorage.removeItem(LAST_LOGIN_AT_KEY);
   console.log('🗑️ Token rimosso');
 };
 
@@ -95,6 +97,7 @@ export const handleOAuthCallback = (): boolean => {
   }
   
   saveToken(accessToken, parseInt(expiresIn));
+  localStorage.setItem(LAST_LOGIN_AT_KEY, String(Date.now()));
   
   // Rimuove hash dall'URL
   window.history.replaceState(null, '', window.location.pathname);
@@ -128,7 +131,7 @@ export const sendEmail = async (
     let email: string;
 
     // Email aziendale per CC automatico
-    const ccEmail = 'fiordacqua@gmail.com';
+    const ccEmail = import.meta.env.VITE_BUSINESS_EMAIL || 'fiordacqua@gmail.com';
 
     if (attachments && attachments.length > 0) {
       // Email con allegati (multipart)

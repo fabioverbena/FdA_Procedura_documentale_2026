@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getToken } from '../services/googleAuth';
 
 interface DocumentoYouSignModalProps {
   show: boolean;
@@ -20,6 +21,27 @@ const DocumentoYouSignModal: React.FC<DocumentoYouSignModalProps> = ({
   documento 
 }) => {
   const [username, setUsername] = useState('');
+
+  const extractDriveFileId = (url: string): string | null => {
+    const clean = url.trim();
+    const patterns = [
+      /[?&]id=([a-zA-Z0-9_-]{25,})/,
+      /\/d\/([a-zA-Z0-9_-]{25,})/,
+      /\/file\/d\/([a-zA-Z0-9_-]{25,})/,
+      /\/folders\/([a-zA-Z0-9_-]{25,})/
+    ];
+
+    for (const p of patterns) {
+      const m = clean.match(p);
+      if (m?.[1]) return m[1];
+    }
+
+    if (clean.length >= 25 && !clean.includes('/') && !clean.includes('.')) {
+      return clean;
+    }
+
+    return null;
+  };
 
   useEffect(() => {
     let savedUsername = localStorage.getItem('fda_username');
@@ -53,33 +75,59 @@ const DocumentoYouSignModal: React.FC<DocumentoYouSignModalProps> = ({
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text)
       .then(() => {
-        alert(`✅ ${label} copiato!`);
+        return;
       })
       .catch(err => {
         console.error('Errore copia:', err);
-        alert('❌ Errore durante la copia');
       });
   };
 
-  const scaricaPDF = () => {
-    // Forza download usando export di Google Drive
-    const downloadUrl = documento.url.includes('/view') 
+  const scaricaPDF = async () => {
+    const token = getToken();
+    const fileId = extractDriveFileId(documento.url);
+
+    if (token && fileId) {
+      try {
+        const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+
+        if (!res.ok) {
+          throw new Error(`Drive download failed: ${res.status}`);
+        }
+
+        const blob = await res.blob();
+        const objectUrl = URL.createObjectURL(blob);
+
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = documento.filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(objectUrl);
+
+        return;
+      } catch (e) {
+        console.error('Errore download via Drive API, fallback a link:', e);
+      }
+    }
+
+    const downloadUrl = documento.url.includes('/view')
       ? documento.url.replace('/view', '/export?format=pdf')
       : documento.url + '?export=download';
-    
+
     const link = document.createElement('a');
     link.href = downloadUrl;
     link.download = documento.filename;
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
-    
+
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
-    setTimeout(() => {
-      alert('✅ PDF in download! Controlla la cartella Downloads.');
-    }, 1000);
   };
 
   const apriYouSign = () => {

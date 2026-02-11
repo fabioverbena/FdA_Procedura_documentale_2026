@@ -9,7 +9,7 @@ const DEFAULT_CONFIG: AppConfig = {
   templateContrattoId: '',
   templateManualeId: '',
   templateGaranziaId: '',
-  spreadsheetId: '',
+  spreadsheetId: import.meta.env.VITE_SPREADSHEET_ID || '',
   logoUrl: ''
 };
 
@@ -89,6 +89,14 @@ const orderToRow = (order: Order): any[] => {
 };
 
 const rowToOrder = (row: any[]): Order => {
+  const statusRaw = (row[16] ?? '') as string;
+
+  const contrattoInviato = row[20] === 'TRUE' || row[20] === true || /contratto\s+inviato/i.test(statusRaw);
+  const contrattoFirmato = row[21] === 'TRUE' || row[21] === true || /contratto\s+firmat/i.test(statusRaw);
+  const manualeInviato = row[22] === 'TRUE' || row[22] === true || /manuale\s+inviato/i.test(statusRaw);
+  const manualeFirmato = row[23] === 'TRUE' || row[23] === true || /manuale\s+firmat/i.test(statusRaw);
+  const garanziaRilasciata = row[24] === 'TRUE' || row[24] === true || /garanzia\s+(rilasciata|inviata|firmat)/i.test(statusRaw);
+
   return {
     id: row[0] || generateSafeId(),
     dataInserimento: row[1] || new Date().toISOString().split('T')[0],
@@ -112,11 +120,11 @@ const rowToOrder = (row: any[]): Order => {
     clientFolderId: row[18] || '',   // 🆕 Colonna S
     firmatiFolderId: row[19] || '',  // 🆕 Colonna T
     workflow: {
-      contrattoInviato: row[20] === 'TRUE' || row[20] === true,  // ✅ Colonna U
-      contrattoFirmato: row[21] === 'TRUE' || row[21] === true,  // ✅ Colonna V
-      manualeInviato: row[22] === 'TRUE' || row[22] === true,    // ✅ Colonna W
-      manualeFirmato: row[23] === 'TRUE' || row[23] === true,    // ✅ Colonna X
-      garanziaRilasciata: row[24] === 'TRUE' || row[24] === true // ✅ Colonna Y
+      contrattoInviato,
+      contrattoFirmato,
+      manualeInviato,
+      manualeFirmato,
+      garanziaRilasciata
     }
   };
 };

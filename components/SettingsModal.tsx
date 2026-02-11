@@ -149,7 +149,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onSave, onClose, onSeed }
                   name="logoUrl" 
                   value={config.logoUrl} 
                   onChange={handleChange} 
-                  className="w-full border-2 border-slate-100 rounded-xl p-3 text-xs focus:border-[#00adef] outline-none font-mono" 
+                  disabled
+                  readOnly
+                  className="w-full border-2 border-slate-100 rounded-xl p-3 text-xs outline-none font-mono bg-slate-50 text-slate-500 cursor-not-allowed" 
                   placeholder="https://drive.google.com/file/d/... o solo ID" 
                 />
               </div>
@@ -162,7 +164,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onSave, onClose, onSeed }
                   name="rootFolderId" 
                   value={config.rootFolderId} 
                   onChange={handleChange} 
-                  className="w-full border-2 border-slate-100 rounded-xl p-3 text-xs focus:border-[#00adef] outline-none font-mono" 
+                  disabled
+                  readOnly
+                  className="w-full border-2 border-slate-100 rounded-xl p-3 text-xs outline-none font-mono bg-slate-50 text-slate-500 cursor-not-allowed" 
                   placeholder="19Xp9YhRRnLOGkolFWm0pBS2wI818KXVp"
                 />
               </div>
@@ -175,7 +179,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onSave, onClose, onSeed }
                   name="spreadsheetId" 
                   value={config.spreadsheetId} 
                   onChange={handleChange} 
-                  className="w-full border-2 border-slate-100 rounded-xl p-3 text-xs focus:border-[#00adef] outline-none font-mono" 
+                  disabled
+                  readOnly
+                  className="w-full border-2 border-slate-100 rounded-xl p-3 text-xs outline-none font-mono bg-slate-50 text-slate-500 cursor-not-allowed" 
                   placeholder="1_CZj56b-FQxgfKM0uYGrRy65cLUPkbTL_3rwoRQytBE"
                 />
               </div>
@@ -196,7 +202,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onSave, onClose, onSeed }
                   name="templateContrattoId" 
                   value={config.templateContrattoId} 
                   onChange={handleChange} 
-                  className="w-full border-2 border-slate-100 rounded-xl p-3 text-xs focus:border-[#00adef] outline-none font-mono" 
+                  disabled
+                  readOnly
+                  className="w-full border-2 border-slate-100 rounded-xl p-3 text-xs outline-none font-mono bg-slate-50 text-slate-500 cursor-not-allowed" 
                   placeholder="1FK0xBomT9HMtKTtU1OshcXKTX5pGaTPnV8Vnp9XZYLM"
                 />
               </div>
@@ -209,7 +217,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onSave, onClose, onSeed }
                   name="templateManualeId" 
                   value={config.templateManualeId} 
                   onChange={handleChange} 
-                  className="w-full border-2 border-slate-100 rounded-xl p-3 text-xs focus:border-[#00adef] outline-none font-mono" 
+                  disabled
+                  readOnly
+                  className="w-full border-2 border-slate-100 rounded-xl p-3 text-xs outline-none font-mono bg-slate-50 text-slate-500 cursor-not-allowed" 
                   placeholder="1oU9hTwV7tswIRiXqGffUd02fz8jIKulPKmapKwgwFJU"
                 />
               </div>
@@ -222,7 +232,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onSave, onClose, onSeed }
                   name="templateGaranziaId" 
                   value={config.templateGaranziaId} 
                   onChange={handleChange} 
-                  className="w-full border-2 border-slate-100 rounded-xl p-3 text-xs focus:border-[#00adef] outline-none font-mono" 
+                  disabled
+                  readOnly
+                  className="w-full border-2 border-slate-100 rounded-xl p-3 text-xs outline-none font-mono bg-slate-50 text-slate-500 cursor-not-allowed" 
                   placeholder="1w8PFeu2f_yBT3sJdxz2vMIFizr8NH1Uprrk_RB0wHvA"
                 />
               </div>
@@ -248,7 +260,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onSave, onClose, onSeed }
           </button>
           <button 
             onClick={handleSave} 
-            className="px-10 py-2.5 bg-[#00adef] text-white text-xs font-black rounded-xl shadow-xl hover:bg-[#009bd6] transition-all uppercase tracking-widest"
+            disabled
+            className="px-10 py-2.5 bg-slate-200 text-slate-400 text-xs font-black rounded-xl shadow-xl uppercase tracking-widest cursor-not-allowed"
           >
             Salva Config
           </button>

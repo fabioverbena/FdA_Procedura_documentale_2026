@@ -10,6 +10,7 @@ interface EmailModalProps {
 }
 
 const EmailModal: React.FC<EmailModalProps> = ({ order, onSend, onClose, forcedDocType }) => {
+  const businessEmail = import.meta.env.VITE_BUSINESS_EMAIL || 'fiordacqua@gmail.com';
   const [step, setStep] = useState<'select' | 'preview'>(forcedDocType ? 'preview' : 'select');
   const [selectedDocs, setSelectedDocs] = useState<string[]>(forcedDocType ? [forcedDocType] : []);
   const [emailContent, setEmailContent] = useState('');
@@ -111,9 +112,9 @@ const EmailModal: React.FC<EmailModalProps> = ({ order, onSend, onClose, forcedD
               ) : (
                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                   <div className="grid grid-cols-[100px_1fr] gap-y-3 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-6 mb-6">
-                    <span>Mittente:</span> <span className="text-slate-900 lowercase italic">fiordacqua@gmail.com</span>
+                    <span>Mittente:</span> <span className="text-slate-900 lowercase italic">{businessEmail}</span>
                     <span>Destinatario:</span> <span className="text-[#00adef] lowercase italic">{order.emailContatto}</span>
-                    <span>CCN:</span> <span className="text-slate-900 lowercase italic">fiordacqua@gmail.com</span>
+                    <span>CCN:</span> <span className="text-slate-900 lowercase italic">{businessEmail}</span>
                     <span>Allegato:</span> <span className="text-blue-600">PDF_{selectedDocs[0]?.toUpperCase()}_2026.pdf</span>
                   </div>
                   

@@ -23,13 +23,35 @@ const OrderTable: React.FC<OrderTableProps> = ({
   onContinuaProcedura,
   isGeneratingDocs
 }) => {
-  const getStatusColor = (status: OrderStatus) => {
-    switch(status) {
-      case OrderStatus.SOSPESO: return 'bg-yellow-100 text-yellow-800 border-yellow-300 shadow-yellow-100/50';
-      case OrderStatus.IN_CORSO: return 'bg-orange-100 text-orange-800 border-orange-200';
-      case OrderStatus.CONCLUSO: return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-slate-100 text-slate-800';
+  const isActionRequired = (order: Order) => {
+    const status = String(order.status);
+    return status === 'Contratto firmato' || status === 'Manuale firmato';
+  };
+
+  const isIterConcluso = (order: Order) => {
+    const status = String(order.status);
+    return status === OrderStatus.CONCLUSO || status === 'Iter concluso' || status === 'Iter Concluso';
+  };
+
+  const getIterButtonColor = (order: Order) => {
+    const status = String(order.status);
+    if (isIterConcluso(order)) {
+      return 'bg-blue-100 text-blue-800 border-blue-200';
     }
+
+    if (status === OrderStatus.SOSPESO) {
+      return 'bg-yellow-100 text-yellow-800 border-yellow-300 shadow-yellow-100/50';
+    }
+
+    if (isActionRequired(order)) {
+      return 'bg-orange-200 text-orange-900 border-orange-300 shadow-orange-200/60';
+    }
+
+    if (status === OrderStatus.IN_CORSO) {
+      return 'bg-slate-100 text-slate-800 border-slate-200';
+    }
+
+    return 'bg-slate-100 text-slate-800 border-slate-200';
   };
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -79,15 +101,20 @@ const OrderTable: React.FC<OrderTableProps> = ({
                   <td className="px-6 py-4">
                  
                   <button 
-  className={`px-3 py-1.5 rounded-xl text-[10px] font-black border uppercase tracking-widest ${getStatusColor(order.status)} transition-all flex items-center gap-2 shadow-sm cursor-default`}
-  title={order.status}
+  className={`px-3 py-1.5 rounded-xl text-[10px] font-black border uppercase tracking-widest ${getIterButtonColor(order)} transition-all flex items-center gap-2 shadow-sm ${isActionRequired(order) ? 'cursor-pointer hover:opacity-95' : 'cursor-default'}`}
+  title={isActionRequired(order) ? '🟧 Azione richiesta: clicca per continuare la procedura' : String(order.status)}
+  onClick={() => {
+    if (isActionRequired(order)) {
+      onContinuaProcedura(order);
+    }
+  }}
 >
-  {order.status}
+  {String(order.status)}
 </button>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      td className<button onClick={() => onPrint(order)} className="p-2 text-slate-400 hover:text-slate-900 hover:bg-white rounded-xl shadow-sm border border-transparent hover:border-slate-200 transition-all" title="Stampa">
+                    <div className={`flex justify-end items-center gap-2 ${isActionRequired(order) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
+                      <button onClick={() => onPrint(order)} className="p-2 text-slate-400 hover:text-slate-900 hover:bg-white rounded-xl shadow-sm border border-transparent hover:border-slate-200 transition-all" title="Stampa">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
                       </button>
                       <button onClick={() => onEmailAction(order)} className="p-2 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Email">
@@ -96,7 +123,7 @@ const OrderTable: React.FC<OrderTableProps> = ({
                       <button onClick={() => onEdit(order)} className="p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="Modifica">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                       </button>
-                      {(order.status === 'Contratto firmato' || order.status === 'Manuale firmato') && (
+                      {isActionRequired(order) && (
   <button
     onClick={() => onContinuaProcedura(order)}
     disabled={isGeneratingDocs}
@@ -110,8 +137,8 @@ const OrderTable: React.FC<OrderTableProps> = ({
       </>
     ) : (
       <>
-        <span className="text-lg">{order.status === 'Manuale firmato' ? '📜' : '📘'}</span>
-        <span>{order.status === 'Manuale firmato' ? 'INVIA GARANZIA' : 'INVIA MANUALE'}</span>
+        <span className="text-lg">{String(order.status) === 'Manuale firmato' ? '📜' : '📘'}</span>
+        <span>{String(order.status) === 'Manuale firmato' ? 'INVIA GARANZIA' : 'INVIA MANUALE'}</span>
       </>
     )}
   </button>

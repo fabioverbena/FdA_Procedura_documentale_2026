@@ -29,41 +29,33 @@ const [isGeneratingDocs, setIsGeneratingDocs] = useState(false);
   const [pendingEmailOrder, setPendingEmailOrder] = useState<{order: Order, forcedDoc?: 'contratto' | 'manuale' | 'garanzia'} | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
-// Carica ordini all'avvio + polling automatico
-useEffect(() => {
-  loadOrders();
-  
-  // Polling ogni 30 secondi
-  const intervalId = setInterval(() => {
-    console.log('🔄 Auto-refresh ordini');
-    loadOrders();
-  }, 30000);
-  
-  return () => clearInterval(intervalId);
-}, []);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error'; sticky?: boolean; ack?: { key: string; value: string }; action?: 'go_database' } | null>(null);
+  const LAST_STATUS_SNAPSHOT_KEY = 'fda_last_status_snapshot_2026';
+  const LAST_STATUS_TOAST_AT_KEY = 'fda_last_status_toast_at_2026';
+  const AUTH_REQUIRED_TOAST_AT_KEY = 'fda_auth_required_toast_at_2026';
+  const ACTION_REQUIRED_TOAST_AT_KEY = 'fda_action_required_toast_at_2026';
+  const ACTION_REQUIRED_ACK_SNAPSHOT_KEY = 'fda_action_required_ack_snapshot_2026';
+  // Carica ordini all'avvio + polling automatico
   useEffect(() => {
     const urlHasToken = window.location.hash.includes('access_token');
-    
+
     if (urlHasToken) {
       const success = handleOAuthCallback();
       if (success) {
-        showToast('Autenticazione Google completata!', 'success');
+        showToast('Autenticazione Google completata!', 'success', 6000);
         setTimeout(() => setIsSettingsOpen(true), 500);
       } else {
         showToast('Errore durante l\'autenticazione', 'error');
       }
     }
-    
+
     loadOrders();
-    
-    // 🆕 POLLING: Ricarica ordini ogni 30 secondi
+
     const intervalId = setInterval(() => {
-      console.log('🔄 Auto-refresh ordini (30 sec)');
+      console.log('🔄 Auto-refresh ordini');
       loadOrders();
     }, 30000);
-    
-    // Cleanup quando componente si smonta
+
     return () => clearInterval(intervalId);
   }, []);
   
@@ -103,8 +95,79 @@ useEffect(() => {
 }, [orders]);  
   const loadOrders = async () => {
     try {
+      const currentConfig = getConfig();
+      if (currentConfig.spreadsheetId && !isAuthenticated()) {
+        const lastToastAt = Number(localStorage.getItem(AUTH_REQUIRED_TOAST_AT_KEY) || '0');
+        const now = Date.now();
+        if (!lastToastAt || now - lastToastAt > 5 * 60 * 1000) {
+          showToast('⚙️ Per vedere gli aggiornamenti automatici devi riconnettere Google (Impostazioni).', 'info');
+          localStorage.setItem(AUTH_REQUIRED_TOAST_AT_KEY, String(now));
+        }
+      }
+
       const data = await getOrders();
       setOrders(data);
+
+      try {
+        const previousRaw = localStorage.getItem(LAST_STATUS_SNAPSHOT_KEY);
+        const previous: Record<string, string> = previousRaw ? JSON.parse(previousRaw) : {};
+
+        const changes = data.filter(o => previous[o.id] && previous[o.id] !== o.status);
+
+        const actionRequiredOrders = data.filter(o => {
+          const status = String(o.status);
+          return status === 'Contratto firmato' || status === 'Manuale firmato';
+        });
+
+        if (actionRequiredOrders.length > 0) {
+          const snapshot = JSON.stringify(
+            actionRequiredOrders
+              .map(o => ({ id: o.id, status: String(o.status) }))
+              .sort((a, b) => a.id.localeCompare(b.id))
+          );
+
+          const lastAckSnapshot = localStorage.getItem(ACTION_REQUIRED_ACK_SNAPSHOT_KEY) || '';
+          const lastActionToastAt = Number(localStorage.getItem(ACTION_REQUIRED_TOAST_AT_KEY) || '0');
+          const now = Date.now();
+
+          const shouldShowBecauseNew = snapshot !== lastAckSnapshot;
+          const shouldShowBecauseTime = !lastActionToastAt || now - lastActionToastAt > 2 * 60 * 1000;
+
+          if (shouldShowBecauseNew && shouldShowBecauseTime) {
+            const first = actionRequiredOrders[0];
+            const nextStepLabel = String(first.status) === 'Contratto firmato' ? 'inviare il Manuale' : 'inviare la Garanzia';
+            showToast(
+              `🟧 Azione richiesta: ${first.nomeAzienda} — puoi ${nextStepLabel}.`,
+              'info',
+              6000,
+              true,
+              { key: ACTION_REQUIRED_ACK_SNAPSHOT_KEY, value: snapshot },
+              'go_database'
+            );
+            localStorage.setItem(ACTION_REQUIRED_TOAST_AT_KEY, String(now));
+          }
+        }
+
+        if (changes.length > 0) {
+          const lastToastAt = Number(localStorage.getItem(LAST_STATUS_TOAST_AT_KEY) || '0');
+          const now = Date.now();
+
+          if (!lastToastAt || now - lastToastAt > 5 * 60 * 1000) {
+            showToast(
+              `Aggiornamenti rilevati: ${changes.length} ordini hanno cambiato stato.`,
+              'info',
+              6000
+            );
+            localStorage.setItem(LAST_STATUS_TOAST_AT_KEY, String(now));
+          }
+        }
+
+        const nextSnapshot: Record<string, string> = {};
+        for (const o of data) nextSnapshot[o.id] = o.status;
+        localStorage.setItem(LAST_STATUS_SNAPSHOT_KEY, JSON.stringify(nextSnapshot));
+      } catch (e) {
+        console.warn('Impossibile calcolare aggiornamenti status:', e);
+      }
     } catch (error) {
       console.error('Errore caricamento ordini:', error);
       showToast('Errore caricamento dati', 'error');
@@ -143,9 +206,29 @@ useEffect(() => {
     return result.sort((a, b) => new Date(b.dataInserimento).getTime() - new Date(a.dataInserimento).getTime());
   }, [orders, searchTerm, currentFilter]);
 
-  const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
+  const showToast = (
+    message: string,
+    type: 'success' | 'info' | 'error' = 'success',
+    durationMs: number = 3000,
+    sticky: boolean = false,
+    ack?: { key: string; value: string },
+    action?: 'go_database'
+  ) => {
+    setToast({ message, type, sticky, ack, action });
+    if (!sticky) {
+      setTimeout(() => setToast(null), durationMs);
+    }
+  };
+
+  const dismissToast = () => {
+    if (toast?.ack) {
+      try {
+        localStorage.setItem(toast.ack.key, toast.ack.value);
+      } catch (e) {
+        console.warn('Impossibile salvare ack toast:', e);
+      }
+    }
+    setToast(null);
   };
 
   const handleFilterFromDashboard = (status: OrderStatus | 'TOTAL' | 'IN_CORSO_ONLY') => {
@@ -654,21 +737,43 @@ const handleSubmit = async (order: Partial<Order>, source: 'manual' | 'yousign')
         </main>
 
         {toast && (
-          <div className={`fixed bottom-8 right-8 px-8 py-4 rounded-2xl shadow-2xl z-[100] animate-in slide-in-from-bottom-10 font-black uppercase tracking-widest text-[10px] flex items-center gap-3 border-2 ${
+          <div
+            onClick={() => {
+              if (toast.action === 'go_database') {
+                setActiveTab('database');
+              }
+            }}
+            className={`fixed bottom-8 right-8 px-8 py-4 rounded-2xl shadow-2xl z-[100] animate-in slide-in-from-bottom-10 font-black uppercase tracking-widest text-[10px] flex items-center gap-3 border-2 ${
             toast.type === 'success' ? 'bg-green-600 border-green-500 text-white' : 
             toast.type === 'error' ? 'bg-red-600 border-red-500 text-white' :
-            'bg-slate-900 border-slate-700 text-white'
-          }`}>
-            <div className={`${
-              toast.type === 'success' ? 'bg-white text-green-600' : 
-              toast.type === 'error' ? 'bg-white text-red-600' :
-              'bg-[#00adef] text-white'
-            } rounded-full p-1`}>
-               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" />
-               </svg>
-            </div>
-            {toast.message}
+            'bg-[#00adef] border-[#009bd6] text-white'
+          } ${toast.action ? 'cursor-pointer' : ''}`}
+          >
+            {toast.type === 'success' ? '✅' : toast.type === 'error' ? '❌' : 'ℹ️'}
+            <span className="max-w-[420px]">{toast.message}</span>
+
+            {toast.sticky && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  dismissToast();
+                }}
+                className="ml-2 px-3 py-1 rounded-lg bg-white/20 hover:bg-white/30 border border-white/20 transition"
+              >
+                OK
+              </button>
+            )}
+
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                dismissToast();
+              }}
+              className="ml-1 p-1 rounded-lg bg-white/10 hover:bg-white/20 border border-white/10 transition"
+              title="Chiudi"
+            >
+              ✕
+            </button>
           </div>
         )}
 
