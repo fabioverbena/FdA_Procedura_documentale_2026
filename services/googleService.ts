@@ -99,6 +99,17 @@ const orderToRow = (order: Order): any[] => {
 const rowToOrder = (row: any[]): Order => {
   const statusRaw = (row[16] ?? '') as string;
 
+  const normalizeStatus = (raw: unknown): OrderStatus => {
+    const s = String(raw ?? '').trim();
+    if (!s) return OrderStatus.IN_CORSO;
+
+    if (/iter\s+concluso/i.test(s)) return OrderStatus.CONCLUSO;
+    if (/^\s*sospeso\s*$/i.test(s)) return OrderStatus.SOSPESO;
+    if (/^\s*in\s+corso\s*$/i.test(s)) return OrderStatus.IN_CORSO;
+
+    return s as OrderStatus;
+  };
+
   const contrattoInviato = row[20] === 'TRUE' || row[20] === true || /contratto\s+inviato/i.test(statusRaw);
   const contrattoFirmato = row[21] === 'TRUE' || row[21] === true || /contratto\s+firmat/i.test(statusRaw);
   const manualeInviato = row[22] === 'TRUE' || row[22] === true || /manuale\s+inviato/i.test(statusRaw);
@@ -123,7 +134,7 @@ const rowToOrder = (row: any[]): Order => {
     matricola: row[13] || '',
     condizione: row[14] as ConditionType || ConditionType.NUOVO,
     prezzo: parseFloat(row[15]) || 0,
-    status: row[16] as OrderStatus || OrderStatus.IN_CORSO,  // ✅ Colonna Q (index 16)
+    status: normalizeStatus(row[16]),  // ✅ Colonna Q (index 16)
     pdfUrl: row[17] || '',           // 🆕 Colonna R
     clientFolderId: row[18] || '',   // 🆕 Colonna S
     firmatiFolderId: row[19] || '',  // 🆕 Colonna T
