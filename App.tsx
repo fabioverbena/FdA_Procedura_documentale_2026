@@ -198,9 +198,9 @@ useEffect(() => {
 
   const stats: DashboardStats = useMemo(() => {
     const isConcluso = (status: unknown) => {
-      const s = String(status || '').trim().toLowerCase();
-      const target = String(OrderStatus.CONCLUSO).trim().toLowerCase();
-      return s === target || s.startsWith('iter concluso');
+      const s = String(status || '').trim();
+      const target = String(OrderStatus.CONCLUSO).trim();
+      return s.toLowerCase() === target.toLowerCase() || /iter\s+concluso/i.test(s);
     };
 
     return {
@@ -215,9 +215,9 @@ useEffect(() => {
     let result = [...orders];
 
     const isConcluso = (status: unknown) => {
-      const s = String(status || '').trim().toLowerCase();
-      const target = String(OrderStatus.CONCLUSO).trim().toLowerCase();
-      return s === target || s.startsWith('iter concluso');
+      const s = String(status || '').trim();
+      const target = String(OrderStatus.CONCLUSO).trim();
+      return s.toLowerCase() === target.toLowerCase() || /iter\s+concluso/i.test(s);
     };
     
     if (currentFilter === 'IN_CORSO_ONLY') {
