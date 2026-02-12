@@ -63,6 +63,18 @@ const [isGeneratingDocs, setIsGeneratingDocs] = useState(false);
   useEffect(() => {
     let lastAuth = isAuthenticated();
 
+    try {
+      const hadPreviousLogin = Boolean(localStorage.getItem('google_oauth_last_login_at'));
+      const lastToastAt = Number(localStorage.getItem(AUTH_EXPIRED_TOAST_AT_KEY) || '0');
+      const now = Date.now();
+      if (!lastAuth && hadPreviousLogin && (!lastToastAt || now - lastToastAt > 5 * 60 * 1000)) {
+        showToast('⚠️ Sessione Google scaduta: riconnetti Google in Impostazioni.', 'info', 6000);
+        localStorage.setItem(AUTH_EXPIRED_TOAST_AT_KEY, String(now));
+      }
+    } catch {
+      // ignore
+    }
+
     const intervalId = setInterval(() => {
       const nowAuth = isAuthenticated();
 
