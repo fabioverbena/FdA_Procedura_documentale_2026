@@ -4,13 +4,14 @@ import { AppConfig } from '../types';
 interface NavbarProps {
   searchTerm: string;
   onSearch: (term: string) => void;
+  onEnterSearch?: () => void;
   activeTab: 'dashboard' | 'new' | 'database';
   setTab: (tab: 'dashboard' | 'new' | 'database') => void;
   onOpenSettings: () => void;
   config: AppConfig;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ searchTerm, onSearch, activeTab, setTab, onOpenSettings }) => {
+const Navbar: React.FC<NavbarProps> = ({ searchTerm, onSearch, onEnterSearch, activeTab, setTab, onOpenSettings }) => {
   const [inputValue, setInputValue] = useState(searchTerm);
   const debounceRef = useRef<number | null>(null);
 
@@ -91,6 +92,11 @@ const Navbar: React.FC<NavbarProps> = ({ searchTerm, onSearch, activeTab, setTab
                 className="block w-full pl-11 pr-11 py-2.5 border-2 border-slate-100 rounded-2xl bg-slate-50 focus:outline-none focus:bg-white focus:border-[#00adef] focus:ring-4 focus:ring-[#00adef]/5 sm:text-xs font-bold transition-all"
                 placeholder="Cerca cliente, matricola o modello..."
                 onChange={(e) => handleSearchChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    onEnterSearch?.();
+                  }
+                }}
               />
             </div>
             <button onClick={onOpenSettings} className="p-3 text-slate-400 hover:text-slate-800 hover:bg-slate-50 rounded-2xl transition-all">

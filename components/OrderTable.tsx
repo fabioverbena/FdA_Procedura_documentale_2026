@@ -4,6 +4,7 @@ import { Order, OrderStatus } from '../types';
 
 interface OrderTableProps {
   orders: Order[];
+  onPrimaryRowClick?: () => void;
   onEdit: (order: Order) => void;
   onDelete: (id: string) => void;
   onPrint: (order: Order) => void;
@@ -15,6 +16,7 @@ interface OrderTableProps {
 
 const OrderTable: React.FC<OrderTableProps> = ({ 
   orders, 
+  onPrimaryRowClick,
   onEdit, 
   onDelete, 
   onPrint, 
@@ -81,7 +83,7 @@ const OrderTable: React.FC<OrderTableProps> = ({
               orders.map(order => (
                 <tr key={order.id} className={`${order.status === OrderStatus.SOSPESO ? 'bg-yellow-100/60' : 'hover:bg-slate-50'} transition-colors group`}>
                   <td className="px-6 py-4 font-bold text-slate-600 whitespace-nowrap">{order.dataInserimento}</td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" onClick={() => onPrimaryRowClick?.()}>
                     <div className="flex flex-col">
                       <span className="font-black text-slate-900 leading-tight uppercase tracking-tighter">{order.nomeAzienda}</span>
                       <span className="text-[10px] text-slate-400 font-mono font-bold">{order.piva}</span>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Order, OrderStatus, DashboardStats, AppConfig } from './types';
 import { getOrders, saveOrder, deleteOrder, updateOrderStatus, getConfig, seedTestData, generateSafeId } from './services/googleService';
 import { handleOAuthCallback, isAuthenticated, sendEmail } from './services/googleAuth';
@@ -16,6 +16,7 @@ const App: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentFilter, setCurrentFilter] = useState<OrderStatus | 'TOTAL' | 'IN_CORSO_ONLY' | null>(null);
+  const pendingClearSearchOnSingleMatchRef = useRef(false);
   const [config, setConfig] = useState<AppConfig>(getConfig());
   const [showDocumentiModal, setShowDocumentiModal] = useState(false);
   // Stati per modal documento YouSign
@@ -269,6 +270,20 @@ useEffect(() => {
       // ignore
     }
   }, [currentFilter, orders.length, filteredOrders.length]);
+
+  useEffect(() => {
+    if (!pendingClearSearchOnSingleMatchRef.current) return;
+
+    if (!String(searchTerm || '').trim()) {
+      pendingClearSearchOnSingleMatchRef.current = false;
+      return;
+    }
+
+    if (filteredOrders.length === 1) {
+      setSearchTerm('');
+      pendingClearSearchOnSingleMatchRef.current = false;
+    }
+  }, [filteredOrders.length, searchTerm]);
 
   const showToast = (
     message: string,
@@ -756,6 +771,9 @@ const handleSubmit = async (order: Partial<Order>, source: 'manual' | 'yousign')
           setTab={handleTabChange}
           searchTerm={searchTerm} 
           onSearch={setSearchTerm} 
+          onEnterSearch={() => {
+            pendingClearSearchOnSingleMatchRef.current = true;
+          }}
           onOpenSettings={() => setIsSettingsOpen(true)} 
           config={config} 
         />
@@ -800,14 +818,14 @@ const handleSubmit = async (order: Partial<Order>, source: 'manual' | 'yousign')
               </div>
               <OrderTable 
                 orders={filteredOrders} 
+                onPrimaryRowClick={() => setSearchTerm('')}
                 onEdit={(o) => { setEditingOrder(o); setActiveTab('new'); }} 
                 onDelete={handleDelete} 
                 onPrint={setPrintingOrder} 
-                onEmailAction={(o) => setPendingEmailOrder({order: o})} 
-                onViewWorkflow={setViewingWorkflow} 
-                onToggleStatus={handleToggleManualStatus} 
-                onContinuaProcedura={handleContinuaProcedura}  
-                isGeneratingDocs={isGeneratingDocs}  
+                onEmailAction={(order) => setPendingEmailOrder({ order })}
+                onToggleStatus={handleToggleManualStatus}
+                onContinuaProcedura={handleContinuaProcedura}
+                isGeneratingDocs={isGeneratingDocs}
               />
             </div>
           )}
