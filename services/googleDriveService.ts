@@ -62,6 +62,27 @@ const findFolderByName = async (
   }
 };
 
+const deleteDriveFile = async (fileId: string, token: string): Promise<boolean> => {
+  try {
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      console.warn('[WARN] Impossibile eliminare file Drive:', fileId, response.status);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.warn('[WARN] deleteDriveFile:', error);
+    return false;
+  }
+};
+
 const createFolder = async (
   folderName: string,
   parentId: string,
@@ -349,10 +370,12 @@ export const AndgeneratePrintDocument = async (
   }
 
   try {
-    const clientFolderId = await getOrCreateClientFolder(order.nomeAzienda, order.piva);
-    if (!clientFolderId) {
+    const folders = await getOrCreateClientFolder(order.nomeAzienda, order.piva);
+    if (!folders?.clientFolderId) {
       throw new Error('Impossibile creare cartella cliente');
     }
+
+    const { clientFolderId } = folders;
 
     const timestamp = new Date().toISOString().split('T')[0];
 
@@ -400,6 +423,8 @@ console.log('[INFO] Generazione PDF...');
       throw new Error('Errore generazione PDF');
     }
 
+    await deleteDriveFile(newDocId, token);
+
     const base64Data = await blobToBase64(pdfBlob);
     const filename = `${documentName}.pdf`;
 
@@ -423,10 +448,12 @@ export const generateAllDocuments = async (
   console.log('[START] Generazione documenti per:', order.nomeAzienda);
 
   try {
-    const clientFolderId = await getOrCreateClientFolder(order.nomeAzienda, order.piva);
-    if (!clientFolderId) {
+    const folders = await getOrCreateClientFolder(order.nomeAzienda, order.piva);
+    if (!folders?.clientFolderId) {
       throw new Error('Impossibile creare cartella');
     }
+
+    const { clientFolderId } = folders;
 
     const replacements = prepareReplacements(order);
     const documents: Array<{ base64: string; filename: string; type: string }> = [];
@@ -444,6 +471,8 @@ export const generateAllDocuments = async (
     await replaceTextInDocument(contractDocId, replacements, token);
     const contractPdf = await exportAsPDF(contractDocId, token);
     if (!contractPdf) throw new Error('Errore PDF contratto');
+
+    await deleteDriveFile(contractDocId, token);
     
     const contractBase64 = await blobToBase64(contractPdf);
     documents.push({
@@ -461,6 +490,8 @@ export const generateAllDocuments = async (
     await replaceTextInDocument(garanziaDocId, replacements, token);
     const garanziaPdf = await exportAsPDF(garanziaDocId, token);
     if (!garanziaPdf) throw new Error('Errore PDF garanzia');
+
+    await deleteDriveFile(garanziaDocId, token);
     
     const garanziaBase64 = await blobToBase64(garanziaPdf);
     documents.push({
@@ -478,6 +509,8 @@ export const generateAllDocuments = async (
     await replaceTextInDocument(manualeDocId, replacements, token);
     const manualePdf = await exportAsPDF(manualeDocId, token);
     if (!manualePdf) throw new Error('Errore PDF manuale');
+
+    await deleteDriveFile(manualeDocId, token);
     
     const manualeBase64 = await blobToBase64(manualePdf);
     documents.push({
