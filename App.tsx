@@ -33,6 +33,7 @@ const [isGeneratingDocs, setIsGeneratingDocs] = useState(false);
   const LAST_STATUS_SNAPSHOT_KEY = 'fda_last_status_snapshot_2026';
   const LAST_STATUS_TOAST_AT_KEY = 'fda_last_status_toast_at_2026';
   const AUTH_REQUIRED_TOAST_AT_KEY = 'fda_auth_required_toast_at_2026';
+  const AUTH_EXPIRED_TOAST_AT_KEY = 'fda_auth_expired_toast_at_2026';
   const ACTION_REQUIRED_TOAST_AT_KEY = 'fda_action_required_toast_at_2026';
   const ACTION_REQUIRED_ACK_SNAPSHOT_KEY = 'fda_action_required_ack_snapshot_2026';
   // Carica ordini all'avvio + polling automatico
@@ -55,6 +56,27 @@ const [isGeneratingDocs, setIsGeneratingDocs] = useState(false);
       console.log('🔄 Auto-refresh ordini');
       loadOrders();
     }, 30000);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    let lastAuth = isAuthenticated();
+
+    const intervalId = setInterval(() => {
+      const nowAuth = isAuthenticated();
+
+      if (lastAuth && !nowAuth) {
+        const lastToastAt = Number(localStorage.getItem(AUTH_EXPIRED_TOAST_AT_KEY) || '0');
+        const now = Date.now();
+        if (!lastToastAt || now - lastToastAt > 5 * 60 * 1000) {
+          showToast('⚠️ Sessione Google scaduta: riconnetti Google in Impostazioni.', 'info', 6000);
+          localStorage.setItem(AUTH_EXPIRED_TOAST_AT_KEY, String(now));
+        }
+      }
+
+      lastAuth = nowAuth;
+    }, 10000);
 
     return () => clearInterval(intervalId);
   }, []);
