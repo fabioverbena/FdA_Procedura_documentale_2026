@@ -4,7 +4,7 @@ import { Order, OrderStatus } from '../types';
 
 interface OrderTableProps {
   orders: Order[];
-  onPrimaryRowClick?: () => void;
+  onSelectOrder?: (order: Order) => void;
   onEdit: (order: Order) => void;
   onDelete: (id: string) => void;
   onPrint: (order: Order) => void;
@@ -16,7 +16,7 @@ interface OrderTableProps {
 
 const OrderTable: React.FC<OrderTableProps> = ({ 
   orders, 
-  onPrimaryRowClick,
+  onSelectOrder,
   onEdit, 
   onDelete, 
   onPrint, 
@@ -81,9 +81,13 @@ const OrderTable: React.FC<OrderTableProps> = ({
               </tr>
             ) : (
               orders.map(order => (
-                <tr key={order.id} className={`${order.status === OrderStatus.SOSPESO ? 'bg-yellow-100/60' : 'hover:bg-slate-50'} transition-colors group`}>
+                <tr
+                  key={order.id}
+                  onClick={() => onSelectOrder?.(order)}
+                  className={`${order.status === OrderStatus.SOSPESO ? 'bg-yellow-100/60' : 'hover:bg-slate-50'} transition-colors group cursor-pointer`}
+                >
                   <td className="px-6 py-4 font-bold text-slate-600 whitespace-nowrap">{order.dataInserimento}</td>
-                  <td className="px-6 py-4" onClick={() => onPrimaryRowClick?.()}>
+                  <td className="px-6 py-4">
                     <div className="flex flex-col">
                       <span className="font-black text-slate-900 leading-tight uppercase tracking-tighter">{order.nomeAzienda}</span>
                       <span className="text-[10px] text-slate-400 font-mono font-bold">{order.piva}</span>
@@ -105,7 +109,8 @@ const OrderTable: React.FC<OrderTableProps> = ({
                   <button 
   className={`px-3 py-1.5 rounded-xl text-[10px] font-black border uppercase tracking-widest ${getIterButtonColor(order)} transition-all flex items-center gap-2 shadow-sm ${isActionRequired(order) ? 'cursor-pointer hover:opacity-95' : 'cursor-default'}`}
   title={isActionRequired(order) ? '🟧 Azione richiesta: clicca per continuare la procedura' : String(order.status)}
-  onClick={() => {
+  onClick={(e) => {
+    e.stopPropagation();
     if (isActionRequired(order)) {
       onContinuaProcedura(order);
     }
@@ -116,18 +121,18 @@ const OrderTable: React.FC<OrderTableProps> = ({
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className={`flex justify-end items-center gap-2 ${isActionRequired(order) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
-                      <button onClick={() => onPrint(order)} className="p-2 text-slate-400 hover:text-slate-900 hover:bg-white rounded-xl shadow-sm border border-transparent hover:border-slate-200 transition-all" title="Stampa">
+                      <button onClick={(e) => { e.stopPropagation(); onPrint(order); }} className="p-2 text-slate-400 hover:text-slate-900 hover:bg-white rounded-xl shadow-sm border border-transparent hover:border-slate-200 transition-all" title="Stampa">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
                       </button>
-                      <button onClick={() => onEmailAction(order)} className="p-2 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Email">
+                      <button onClick={(e) => { e.stopPropagation(); onEmailAction(order); }} className="p-2 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Email">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                       </button>
-                      <button onClick={() => onEdit(order)} className="p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="Modifica">
+                      <button onClick={(e) => { e.stopPropagation(); onEdit(order); }} className="p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="Modifica">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                       </button>
                       {isActionRequired(order) && (
   <button
-    onClick={() => onContinuaProcedura(order)}
+    onClick={(e) => { e.stopPropagation(); onContinuaProcedura(order); }}
     disabled={isGeneratingDocs}
     className="px-4 py-2.5 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg font-bold hover:from-green-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm border-2 border-green-400"
     title={isGeneratingDocs ? "Generazione in corso..." : "Continua Procedura"}

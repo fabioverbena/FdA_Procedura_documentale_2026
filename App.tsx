@@ -16,6 +16,7 @@ const App: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentFilter, setCurrentFilter] = useState<OrderStatus | 'TOTAL' | 'IN_CORSO_ONLY' | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const pendingClearSearchOnSingleMatchRef = useRef(false);
   const [config, setConfig] = useState<AppConfig>(getConfig());
   const [showDocumentiModal, setShowDocumentiModal] = useState(false);
@@ -259,8 +260,22 @@ useEffect(() => {
         o.tipoContratto.toLowerCase().includes(term)
       );
     }
+
+    if (selectedOrderId) {
+      result = result.filter(o => o.id === selectedOrderId);
+    }
     return result.sort((a, b) => new Date(b.dataInserimento).getTime() - new Date(a.dataInserimento).getTime());
-  }, [orders, searchTerm, currentFilter]);
+  }, [orders, searchTerm, currentFilter, selectedOrderId]);
+
+  useEffect(() => {
+    if (String(searchTerm || '').trim()) {
+      setSelectedOrderId(null);
+    }
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setSelectedOrderId(null);
+  }, [currentFilter]);
 
   useEffect(() => {
     try {
@@ -312,6 +327,7 @@ useEffect(() => {
 
   const handleFilterFromDashboard = (status: OrderStatus | 'TOTAL' | 'IN_CORSO_ONLY') => {
     setSearchTerm('');
+    setSelectedOrderId(null);
     setCurrentFilter(status);
     setActiveTab('database');
   };
@@ -771,8 +787,10 @@ const handleSubmit = async (order: Partial<Order>, source: 'manual' | 'yousign')
           setTab={handleTabChange}
           searchTerm={searchTerm} 
           onSearch={setSearchTerm} 
-          onEnterSearch={() => {
-            pendingClearSearchOnSingleMatchRef.current = true;
+          onEnterSearch={(term) => {
+            if (String(term || '').trim()) {
+              pendingClearSearchOnSingleMatchRef.current = true;
+            }
           }}
           onOpenSettings={() => setIsSettingsOpen(true)} 
           config={config} 
@@ -818,7 +836,10 @@ const handleSubmit = async (order: Partial<Order>, source: 'manual' | 'yousign')
               </div>
               <OrderTable 
                 orders={filteredOrders} 
-                onPrimaryRowClick={() => setSearchTerm('')}
+                onSelectOrder={(order) => {
+                  setSelectedOrderId(prev => (prev === order.id ? null : order.id));
+                  setSearchTerm('');
+                }}
                 onEdit={(o) => { setEditingOrder(o); setActiveTab('new'); }} 
                 onDelete={handleDelete} 
                 onPrint={setPrintingOrder} 

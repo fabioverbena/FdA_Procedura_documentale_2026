@@ -4,7 +4,7 @@ import { AppConfig } from '../types';
 interface NavbarProps {
   searchTerm: string;
   onSearch: (term: string) => void;
-  onEnterSearch?: () => void;
+  onEnterSearch?: (term: string) => void;
   activeTab: 'dashboard' | 'new' | 'database';
   setTab: (tab: 'dashboard' | 'new' | 'database') => void;
   onOpenSettings: () => void;
@@ -94,7 +94,21 @@ const Navbar: React.FC<NavbarProps> = ({ searchTerm, onSearch, onEnterSearch, ac
                 onChange={(e) => handleSearchChange(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
-                    onEnterSearch?.();
+                    const trimmed = String(inputValue || '').trim();
+
+                    if (debounceRef.current) {
+                      window.clearTimeout(debounceRef.current);
+                      debounceRef.current = null;
+                    }
+
+                    if (trimmed === '') {
+                      onSearch('');
+                      onEnterSearch?.('');
+                      return;
+                    }
+
+                    onSearch(trimmed);
+                    onEnterSearch?.(trimmed);
                   }
                 }}
               />
