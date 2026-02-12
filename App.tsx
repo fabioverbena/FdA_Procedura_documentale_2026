@@ -219,12 +219,17 @@ useEffect(() => {
       const target = String(OrderStatus.CONCLUSO).trim();
       return s.toLowerCase() === target.toLowerCase() || /iter\s+concluso/i.test(s);
     };
+
+    const isConclusiFilter = (filter: unknown) => {
+      const f = String(filter || '').trim();
+      return /concluso/i.test(f);
+    };
     
     if (currentFilter === 'IN_CORSO_ONLY') {
       // Mostra TUTTI tranne "Iter concluso"
       result = result.filter(o => !isConcluso(o.status));
     } else if (currentFilter && currentFilter !== 'TOTAL') {
-      if (currentFilter === OrderStatus.CONCLUSO) {
+      if (isConclusiFilter(currentFilter)) {
         result = result.filter(o => isConcluso(o.status));
       } else {
         result = result.filter(o => o.status === currentFilter);
@@ -243,6 +248,15 @@ useEffect(() => {
     }
     return result.sort((a, b) => new Date(b.dataInserimento).getTime() - new Date(a.dataInserimento).getTime());
   }, [orders, searchTerm, currentFilter]);
+
+  useEffect(() => {
+    try {
+      const f = String(currentFilter ?? 'null');
+      console.log('[DEBUG] currentFilter:', f, 'orders:', orders.length, 'filtered:', filteredOrders.length);
+    } catch {
+      // ignore
+    }
+  }, [currentFilter, orders.length, filteredOrders.length]);
 
   const showToast = (
     message: string,
