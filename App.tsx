@@ -17,6 +17,7 @@ const App: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentFilter, setCurrentFilter] = useState<OrderStatus | 'TOTAL' | 'IN_CORSO_ONLY' | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [enterTick, setEnterTick] = useState(0);
   const pendingClearSearchOnSingleMatchRef = useRef(false);
   const [config, setConfig] = useState<AppConfig>(getConfig());
   const [showDocumentiModal, setShowDocumentiModal] = useState(false);
@@ -298,7 +299,7 @@ useEffect(() => {
       setSearchTerm('');
       pendingClearSearchOnSingleMatchRef.current = false;
     }
-  }, [filteredOrders.length, searchTerm]);
+  }, [filteredOrders.length, searchTerm, enterTick]);
 
   const showToast = (
     message: string,
@@ -789,6 +790,7 @@ const handleSubmit = async (order: Partial<Order>, source: 'manual' | 'yousign')
           onSearch={setSearchTerm} 
           onEnterSearch={(term) => {
             if (String(term || '').trim()) {
+              setEnterTick(t => t + 1);
               pendingClearSearchOnSingleMatchRef.current = true;
             }
           }}
