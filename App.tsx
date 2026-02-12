@@ -270,6 +270,7 @@ useEffect(() => {
   };
 
   const handleFilterFromDashboard = (status: OrderStatus | 'TOTAL' | 'IN_CORSO_ONLY') => {
+    setSearchTerm('');
     setCurrentFilter(status);
     setActiveTab('database');
   };
