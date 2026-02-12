@@ -103,7 +103,7 @@ useEffect(() => {
       for (const order of ordiniDaCompletare) {
         const updatedOrder = {
           ...order,
-          status: 'Iter concluso' as OrderStatus
+          status: OrderStatus.CONCLUSO
         };
         await saveOrder(updatedOrder);
         console.log(`✅ Ordine ${order.id} → Iter concluso`);
@@ -197,22 +197,36 @@ useEffect(() => {
   };
 
   const stats: DashboardStats = useMemo(() => {
+    const isConcluso = (status: unknown) => {
+      const s = String(status || '').toLowerCase();
+      return s === String(OrderStatus.CONCLUSO).toLowerCase() || s === 'iter concluso';
+    };
+
     return {
       total: orders.length,
       sospesi: orders.filter(o => o.status === OrderStatus.SOSPESO).length,
-      conclusi: orders.filter(o => o.status === 'Iter concluso').length,  // ✅ Fix maiuscola
-    inCorso: orders.filter(o => o.status !== 'Iter concluso').length,   // ✅ Fix maiuscola
+      conclusi: orders.filter(o => isConcluso(o.status)).length,
+      inCorso: orders.filter(o => !isConcluso(o.status)).length,
     };
   }, [orders]);
 
   const filteredOrders = useMemo(() => {
     let result = [...orders];
+
+    const isConcluso = (status: unknown) => {
+      const s = String(status || '').toLowerCase();
+      return s === String(OrderStatus.CONCLUSO).toLowerCase() || s === 'iter concluso';
+    };
     
     if (currentFilter === 'IN_CORSO_ONLY') {
       // Mostra TUTTI tranne "Iter concluso"
-      result = result.filter(o => o.status !== 'Iter concluso');
+      result = result.filter(o => !isConcluso(o.status));
     } else if (currentFilter && currentFilter !== 'TOTAL') {
-      result = result.filter(o => o.status === currentFilter);
+      if (currentFilter === OrderStatus.CONCLUSO) {
+        result = result.filter(o => isConcluso(o.status));
+      } else {
+        result = result.filter(o => o.status === currentFilter);
+      }
     }
     
     if (searchTerm.trim()) {
