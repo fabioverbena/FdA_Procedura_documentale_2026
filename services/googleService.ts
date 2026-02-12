@@ -4,6 +4,11 @@ import { getToken } from "./googleAuth";
 const STORAGE_KEY = 'fda_orders_2026';
 const CONFIG_KEY = 'fda_config_2026';
 
+const getOrdersStorageKey = (spreadsheetId?: string): string => {
+  const id = String(spreadsheetId || '').trim();
+  return id ? `${STORAGE_KEY}_${id}` : STORAGE_KEY;
+};
+
 const DEFAULT_CONFIG: AppConfig = {
   rootFolderId: '',
   templateContrattoId: '',
@@ -198,7 +203,7 @@ export const getOrders = async (): Promise<Order[]> => {
     return data.values.map(rowToOrder);
   } catch (error) {
     console.error('Errore lettura da Sheets, fallback a localStorage:', error);
-    return getOrdersFromLocalStorage();
+    return getOrdersFromLocalStorage(config.spreadsheetId);
   }
 };
 
@@ -239,10 +244,10 @@ export const saveOrder = async (order: Order): Promise<void> => {
     }
     
     // Aggiorna anche localStorage come backup
-    saveOrderToLocalStorage(order);
+    saveOrderToLocalStorage(order, config.spreadsheetId);
   } catch (error) {
     console.error('Errore salvataggio su Sheets, fallback a localStorage:', error);
-    saveOrderToLocalStorage(order);
+    saveOrderToLocalStorage(order, config.spreadsheetId);
     throw error;
   }
 };
@@ -283,10 +288,10 @@ export const deleteOrder = async (id: string): Promise<void> => {
       );
     }
     
-    deleteOrderFromLocalStorage(id);
+    deleteOrderFromLocalStorage(id, config.spreadsheetId);
   } catch (error) {
     console.error('Errore eliminazione da Sheets:', error);
-    deleteOrderFromLocalStorage(id);
+    deleteOrderFromLocalStorage(id, config.spreadsheetId);
     throw error;
   }
 };
@@ -303,29 +308,29 @@ export const updateOrderStatus = async (id: string, status: OrderStatus): Promis
 // ==========================================
 // FALLBACK: localStorage operations
 // ==========================================
-const getOrdersFromLocalStorage = (): Order[] => {
+const getOrdersFromLocalStorage = (spreadsheetId?: string): Order[] => {
   try {
-    const data = localStorage.getItem(STORAGE_KEY);
+    const data = localStorage.getItem(getOrdersStorageKey(spreadsheetId));
     return data ? JSON.parse(data) : [];
   } catch (e) {
     return [];
   }
 };
 
-const saveOrderToLocalStorage = (order: Order): void => {
-  const orders = getOrdersFromLocalStorage();
+const saveOrderToLocalStorage = (order: Order, spreadsheetId?: string): void => {
+  const orders = getOrdersFromLocalStorage(spreadsheetId);
   const index = orders.findIndex(o => o.id === order.id);
   if (index >= 0) {
     orders[index] = { ...order };
   } else {
     orders.push({ ...order });
   }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
+  localStorage.setItem(getOrdersStorageKey(spreadsheetId), JSON.stringify(orders));
 };
 
-const deleteOrderFromLocalStorage = (id: string): void => {
-  const orders = getOrdersFromLocalStorage().filter(o => o.id !== id);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
+const deleteOrderFromLocalStorage = (id: string, spreadsheetId?: string): void => {
+  const orders = getOrdersFromLocalStorage(spreadsheetId).filter(o => o.id !== id);
+  localStorage.setItem(getOrdersStorageKey(spreadsheetId), JSON.stringify(orders));
 };
 
 // ==========================================
