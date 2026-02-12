@@ -38,12 +38,13 @@ const findFolderByName = async (
     console.log('[DEBUG] Ricerca cartella:', folderName);
     
     const response = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)`,
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)&supportsAllDrives=true&includeItemsFromAllDrives=true`,
       { headers: { 'Authorization': `Bearer ${token}` } }
     );
 
     if (!response.ok) {
-      console.error('[ERROR] Errore ricerca cartella:', response.status);
+      const errorData = await response.json().catch(() => null);
+      console.error('[ERROR] Errore ricerca cartella:', response.status, errorData);
       return null;
     }
     
@@ -64,7 +65,7 @@ const findFolderByName = async (
 
 const deleteDriveFile = async (fileId: string, token: string): Promise<boolean> => {
   try {
-    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?supportsAllDrives=true`, {
       method: 'DELETE',
       headers: {
         Authorization: `Bearer ${token}`
@@ -72,7 +73,8 @@ const deleteDriveFile = async (fileId: string, token: string): Promise<boolean> 
     });
 
     if (!response.ok) {
-      console.warn('[WARN] Impossibile eliminare file Drive:', fileId, response.status);
+      const errorData = await response.json().catch(() => null);
+      console.warn('[WARN] Impossibile eliminare file Drive:', fileId, response.status, errorData);
       return false;
     }
 
@@ -102,7 +104,11 @@ const createFolder = async (
       })
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      console.error('[ERROR] createFolder response:', response.status, errorData);
+      return null;
+    }
     const data = await response.json();
     console.log('[OK] Cartella creata:', folderName);
     return data.id;
@@ -151,7 +157,7 @@ const copyTemplate = async (
 ): Promise<string | null> => {
   try {
     const response = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${templateId}/copy`,
+      `https://www.googleapis.com/drive/v3/files/${templateId}/copy?supportsAllDrives=true`,
       {
         method: 'POST',
         headers: {
@@ -165,7 +171,11 @@ const copyTemplate = async (
       }
     );
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      console.error('[ERROR] copyTemplate response:', response.status, errorData);
+      return null;
+    }
     const data = await response.json();
     console.log('[OK] Template copiato:', newName);
     return data.id;
