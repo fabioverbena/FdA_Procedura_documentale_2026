@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AppConfig } from '../types';
 
 interface NavbarProps {
@@ -11,11 +11,43 @@ interface NavbarProps {
 }
 
 const Navbar: React.FC<NavbarProps> = ({ searchTerm, onSearch, activeTab, setTab, onOpenSettings }) => {
+  const [inputValue, setInputValue] = useState(searchTerm);
+  const debounceRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    setInputValue(searchTerm);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        window.clearTimeout(debounceRef.current);
+      }
+    };
+  }, []);
+
   const handleSearchChange = (value: string) => {
-    onSearch(value);
-    if (value.trim() !== '' && activeTab !== 'database') {
+    setInputValue(value);
+
+    const trimmed = value.trim();
+
+    if (trimmed !== '' && activeTab !== 'database') {
       setTab('database');
     }
+
+    if (debounceRef.current) {
+      window.clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+
+    if (trimmed === '') {
+      onSearch('');
+      return;
+    }
+
+    debounceRef.current = window.setTimeout(() => {
+      onSearch(trimmed);
+    }, 250);
   };
 
   return (
@@ -55,7 +87,7 @@ const Navbar: React.FC<NavbarProps> = ({ searchTerm, onSearch, activeTab, setTab
               </span>
               <input
                 type="text"
-                value={searchTerm}
+                value={inputValue}
                 className="block w-full pl-11 pr-11 py-2.5 border-2 border-slate-100 rounded-2xl bg-slate-50 focus:outline-none focus:bg-white focus:border-[#00adef] focus:ring-4 focus:ring-[#00adef]/5 sm:text-xs font-bold transition-all"
                 placeholder="Cerca cliente, matricola o modello..."
                 onChange={(e) => handleSearchChange(e.target.value)}
