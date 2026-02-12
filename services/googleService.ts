@@ -29,10 +29,12 @@ export const getConfig = (): AppConfig => {
     const data = localStorage.getItem(CONFIG_KEY);
     const stored = data ? (JSON.parse(data) as Partial<AppConfig>) : {};
 
+    const envSpreadsheetId = (DEFAULT_CONFIG.spreadsheetId || '').trim();
+
     return {
       ...DEFAULT_CONFIG,
       ...stored,
-      spreadsheetId: (stored.spreadsheetId || '').trim() || DEFAULT_CONFIG.spreadsheetId
+      spreadsheetId: envSpreadsheetId || (stored.spreadsheetId || '').trim()
     };
   } catch (e) {
     return DEFAULT_CONFIG;
