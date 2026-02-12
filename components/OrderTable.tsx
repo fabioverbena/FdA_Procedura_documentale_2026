@@ -83,28 +83,27 @@ const OrderTable: React.FC<OrderTableProps> = ({
               orders.map(order => (
                 <tr
                   key={order.id}
-                  onClick={() => onSelectOrder?.(order)}
                   className={`${order.status === OrderStatus.SOSPESO ? 'bg-yellow-100/60' : 'hover:bg-slate-50'} transition-colors group cursor-pointer`}
                 >
-                  <td className="px-6 py-4 font-bold text-slate-600 whitespace-nowrap">{order.dataInserimento}</td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 font-bold text-slate-600 whitespace-nowrap" onClick={() => onSelectOrder?.(order)}>{order.dataInserimento}</td>
+                  <td className="px-6 py-4" onClick={() => onSelectOrder?.(order)}>
                     <div className="flex flex-col">
                       <span className="font-black text-slate-900 leading-tight uppercase tracking-tighter">{order.nomeAzienda}</span>
                       <span className="text-[10px] text-slate-400 font-mono font-bold">{order.piva}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" onClick={() => onSelectOrder?.(order)}>
                     <span className="px-2 py-0.5 rounded text-[10px] font-black bg-slate-900 text-white uppercase tracking-tighter">
                       {order.tipoContratto}
                     </span>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" onClick={() => onSelectOrder?.(order)}>
                     <div className="flex flex-col">
                        <span className="text-slate-800 font-bold">{order.modello}</span>
                        <span className="text-[10px] text-slate-500 font-bold">Mat: {order.matricola}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" onClick={() => onSelectOrder?.(order)}>
                  
                   <button 
   className={`px-3 py-1.5 rounded-xl text-[10px] font-black border uppercase tracking-widest ${getIterButtonColor(order)} transition-all flex items-center gap-2 shadow-sm ${isActionRequired(order) ? 'cursor-pointer hover:opacity-95' : 'cursor-default'}`}
@@ -119,7 +118,7 @@ const OrderTable: React.FC<OrderTableProps> = ({
   {String(order.status)}
 </button>
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                     <div className={`flex justify-end items-center gap-2 ${isActionRequired(order) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
                       <button onClick={(e) => { e.stopPropagation(); onPrint(order); }} className="p-2 text-slate-400 hover:text-slate-900 hover:bg-white rounded-xl shadow-sm border border-transparent hover:border-slate-200 transition-all" title="Stampa">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
