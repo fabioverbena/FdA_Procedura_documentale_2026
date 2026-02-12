@@ -379,7 +379,8 @@ useEffect(() => {
     
     try {
       // Determina quale documento generare
-      const docType = order.status === 'Manuale firmato' ? 'garanzia' : 'manuale';
+      const status = String(order.status);
+      const docType = status === 'Manuale firmato' ? 'garanzia' : 'manuale';
       const docLabel = docType === 'garanzia' ? 'Garanzia' : 'Manuale';
       const newStatus = docType === 'garanzia' ? 'Garanzia inviata' : 'Manuale inviato';
       
@@ -501,12 +502,23 @@ useEffect(() => {
     try {
       console.log('📧 Inizio processo invio email con PDF allegato...');
 
-      const docType = docs[0] as 'contratto' | 'ddt' | 'fattura' | 'ordine' | 'installazione';
+      const docType = docs[0] as
+        | 'contratto'
+        | 'manuale'
+        | 'garanzia'
+        | 'ddt'
+        | 'fattura'
+        | 'ordine'
+        | 'installazione';
       
       console.log('📄 Generazione PDF da template:', docType);
       showToast('Generazione PDF in corso...', 'info');
-      
-      const pdfResult = await generateAndPrintDocument(order, docType);
+
+      if (docType !== 'contratto' && docType !== 'manuale' && docType !== 'garanzia') {
+        throw new Error(`Tipo documento non supportato: ${docType}`);
+      }
+
+      const pdfResult = await AndgeneratePrintDocument(order, docType);
       
       if (!pdfResult) {
         throw new Error('Errore generazione PDF da template Google Docs');
@@ -603,7 +615,7 @@ useEffect(() => {
 
   setIsLoading(true);
   try {
-    const result = await generateAndPrintDocument(printingOrder, documentType);
+    const result = await AndgeneratePrintDocument(printingOrder, documentType);
     
     if (result) {
       // Scarica il PDF
@@ -756,6 +768,9 @@ const handleSubmit = async (order: Partial<Order>, source: 'manual' | 'yousign')
               <button
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (toast.action === 'go_database') {
+                    setActiveTab('database');
+                  }
                   dismissToast();
                 }}
                 className="ml-2 px-3 py-1 rounded-lg bg-white/20 hover:bg-white/30 border border-white/20 transition"
