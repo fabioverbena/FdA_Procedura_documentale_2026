@@ -15,7 +15,8 @@ const DEFAULT_CONFIG: AppConfig = {
   templateManualeId: '',
   templateGaranziaId: '',
   spreadsheetId: import.meta.env.VITE_SPREADSHEET_ID || '',
-  logoUrl: ''
+  logoUrl: '',
+  localPdfServiceUrl: 'http://127.0.0.1:7601'
 };
 
 export const generateSafeId = () => {

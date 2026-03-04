@@ -241,6 +241,30 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onSave, onClose, onSeed }
             </div>
           </div>
 
+          <div className="space-y-4">
+            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-2">
+              Servizio PDF Locale (PC Lavoro)
+            </h4>
+            <div className="grid gap-4">
+              <div>
+                <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">
+                  URL Servizio PDF Locale
+                </label>
+                <input 
+                  type="text" 
+                  name="localPdfServiceUrl" 
+                  value={config.localPdfServiceUrl || ''} 
+                  onChange={handleChange} 
+                  className="w-full border-2 border-slate-200 rounded-xl p-3 text-xs outline-none font-mono focus:border-[#00adef] transition-colors" 
+                  placeholder="http://127.0.0.1:7601" 
+                />
+                <p className="text-[9px] text-slate-400 mt-1">
+                  Indirizzo del mini-servizio locale che serve i PDF ERP. Lascia il default se non sai cosa modificare.
+                </p>
+              </div>
+            </div>
+          </div>
+
           <div className="pt-4 border-t">
             <button 
               onClick={onSeed} 
@@ -260,8 +284,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onSave, onClose, onSeed }
           </button>
           <button 
             onClick={handleSave} 
-            disabled
-            className="px-10 py-2.5 bg-slate-200 text-slate-400 text-xs font-black rounded-xl shadow-xl uppercase tracking-widest cursor-not-allowed"
+            className="px-10 py-2.5 bg-[#00adef] text-white text-xs font-black rounded-xl shadow-xl uppercase tracking-widest hover:bg-[#009bd6] transition-all"
           >
             Salva Config
           </button>

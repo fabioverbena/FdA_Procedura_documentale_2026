@@ -11,6 +11,7 @@ import EmailModal from './components/EmailModal';
 import PrintModal from './components/PrintModal';
 import SettingsModal from './components/SettingsModal';
 import DocumentoYouSignModal from './components/DocumentoYouSignModal';
+import ImportPdfModal from './components/ImportPdfModal';
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'new' | 'database'>('dashboard');
   const [orders, setOrders] = useState<Order[]>([]);
@@ -31,6 +32,7 @@ const [isGeneratingDocs, setIsGeneratingDocs] = useState(false);
   const [printingOrder, setPrintingOrder] = useState<Order | null>(null);
   const [pendingEmailOrder, setPendingEmailOrder] = useState<{order: Order, forcedDoc?: 'contratto' | 'manuale' | 'garanzia'} | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [showImportPdfModal, setShowImportPdfModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error'; sticky?: boolean; ack?: { key: string; value: string }; action?: 'go_database' } | null>(null);
   const LAST_STATUS_SNAPSHOT_KEY = 'fda_last_status_snapshot_2026';
@@ -577,11 +579,37 @@ useEffect(() => {
     }
   };
   const handleTabChange = (tab: 'dashboard' | 'new' | 'database') => {
+    if (tab === 'new' && editingOrder === null) {
+      setShowImportPdfModal(true);
+      return;
+    }
     if (tab === 'new' && editingOrder !== null) {
-      console.log('🔵 Reset editingOrder per nuovo ordine');
-      setEditingOrder(null);
+      console.log('🔵 Editing order, skip import modal');
     }
     setActiveTab(tab);
+  };
+
+  const handleImportManual = () => {
+    setShowImportPdfModal(false);
+    setEditingOrder(null);
+    setActiveTab('new');
+  };
+
+  const handleImportFromPdf = (data: Partial<Order>) => {
+    setShowImportPdfModal(false);
+    const prefilled = {
+      id: '',
+      dataInserimento: new Date().toISOString().split('T')[0],
+      nomeAzienda: data.nomeAzienda || '',
+      piva: data.piva || '',
+      indirizzo: data.indirizzo || '',
+      cap: data.cap || '',
+      citta: data.citta || '',
+      provincia: data.provincia || '',
+      prezzo: data.prezzo || 0,
+    } as Partial<Order>;
+    setEditingOrder(prefilled as Order);
+    setActiveTab('new');
   };
 
   const handleSendEmail = async (content: string, docs: string[]) => {
@@ -897,6 +925,14 @@ const handleSubmit = async (order: Partial<Order>, source: 'manual' | 'yousign')
             </button>
           </div>
         )}
+
+        <ImportPdfModal
+          show={showImportPdfModal}
+          onClose={() => setShowImportPdfModal(false)}
+          onManual={handleImportManual}
+          onImportData={handleImportFromPdf}
+          showToast={(msg, type) => showToast(msg, type)}
+        />
 
         {isSettingsOpen && (
           <SettingsModal 

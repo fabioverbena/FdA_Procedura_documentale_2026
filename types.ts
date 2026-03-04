@@ -30,6 +30,7 @@ export interface AppConfig {
   templateGaranziaId: string;
   spreadsheetId: string;
   logoUrl?: string;
+  localPdfServiceUrl?: string;
 }
 
 export interface Order {
