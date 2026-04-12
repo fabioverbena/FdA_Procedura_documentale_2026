@@ -1,4 +1,4 @@
-import { Order, OrderStatus, AppConfig, ContractType, ModelType, ConditionType } from "../types";
+import { Order, OrderStatus, AppConfig, ContractType, ModelType, ConditionType, getCurrentStep, getStepDescription } from "../types";
 import { getToken } from "./googleAuth";
 
 const STORAGE_KEY = 'fda_orders_2026';
@@ -271,6 +271,96 @@ export const updateOrderStatus = async (id: string, status: OrderStatus): Promis
     order.status = status;
     await saveOrder(order);
   }
+};
+
+// ==========================================
+// ENDPOINT EQUIVALENTI: avvia / stato / avanza
+// ==========================================
+
+// POST /api/procedure/[id]/avvia
+// Imposta status = IN_CORSO (col 17)
+export const avviaProcedura = async (id: string): Promise<{ ok: boolean; status: OrderStatus }> => {
+  const orders = await getOrders();
+  const order = orders.find(o => o.id === id);
+  if (!order) throw new Error(`Procedura ${id} non trovata`);
+
+  order.status = OrderStatus.IN_CORSO;
+  await saveOrder(order);
+  return { ok: true, status: order.status };
+};
+
+// GET /api/procedure/[id]/stato
+// Legge status (col 17) + workflow (col 21-25)
+export const getStatoProcedura = async (id: string): Promise<{
+  status: OrderStatus;
+  step: number;
+  stepDescription: string;
+  workflow: Order['workflow'];
+} | null> => {
+  const orders = await getOrders();
+  const order = orders.find(o => o.id === id);
+  if (!order) return null;
+
+  const step = getCurrentStep(order.workflow);
+  return {
+    status: order.status,
+    step,
+    stepDescription: getStepDescription(step),
+    workflow: order.workflow
+  };
+};
+
+// POST /api/procedure/[id]/avanza
+// Avanza al prossimo step del workflow aggiornando la colonna corrispondente:
+//   step 1 → col 21 contrattoInviato = true
+//   step 2 → col 22 contrattoFirmato = true
+//   step 3 → col 23 manualeInviato   = true
+//   step 4 → col 24 manualeFirmato   = true
+//   step 5 → col 25 garanziaRilasciata = true + status = CONCLUSO (col 17)
+export const avanzaProcedura = async (id: string): Promise<{
+  ok: boolean;
+  stepAvanzato: number;
+  stepCorrente: number;
+  status: OrderStatus;
+  workflow: Order['workflow'];
+}> => {
+  const orders = await getOrders();
+  const order = orders.find(o => o.id === id);
+  if (!order) throw new Error(`Procedura ${id} non trovata`);
+
+  const stepPrima = getCurrentStep(order.workflow);
+  if (stepPrima >= 6) {
+    return {
+      ok: false,
+      stepAvanzato: 0,
+      stepCorrente: stepPrima,
+      status: order.status,
+      workflow: order.workflow
+    };
+  }
+
+  const w = { ...order.workflow };
+  switch (stepPrima) {
+    case 1: w.contrattoInviato = true; break;   // col 21
+    case 2: w.contrattoFirmato = true; break;   // col 22
+    case 3: w.manualeInviato = true; break;     // col 23
+    case 4: w.manualeFirmato = true; break;     // col 24
+    case 5:
+      w.garanziaRilasciata = true;              // col 25
+      order.status = OrderStatus.CONCLUSO;      // col 17
+      break;
+  }
+
+  order.workflow = w;
+  await saveOrder(order);
+
+  return {
+    ok: true,
+    stepAvanzato: stepPrima,
+    stepCorrente: getCurrentStep(w),
+    status: order.status,
+    workflow: w
+  };
 };
 
 // ==========================================
