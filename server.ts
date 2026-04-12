@@ -3,10 +3,7 @@
 // Avvio: npm run server
 // Ascolta su http://localhost:3001
 
-import { config } from 'dotenv';
-config({ path: '.env.local' }); // carica prima .env.local (Vite convention)
-config();                        // fallback su .env
-
+// Env caricato via --env-file=.env.local nel package.json script "server"
 import express, { NextFunction, Request, Response } from 'express';
 import { checkBearer } from './api/_lib/auth.ts';
 import { avviaProcedura, avanzaProcedura, getStatoProcedura } from './api/_lib/sheetsServer.ts';
