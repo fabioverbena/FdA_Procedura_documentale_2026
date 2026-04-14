@@ -1,17 +1,7 @@
 // services/googleDriveService.ts
 import { Order } from '../types';
 import { getToken } from './googleAuth';
-
-const DRIVE_CONFIG = {
-  clientiFolderId: import.meta.env.VITE_GDRIVE_CLIENTI_FOLDER_ID || '',
-  templatesFolderId: import.meta.env.VITE_GDRIVE_TEMPLATES_FOLDER_ID || '',
-  templates: {
-    accordoGrenke: import.meta.env.VITE_GDRIVE_TEMPLATE_ACCORDO_GRENKE_ID || '',
-    contrattoB2B: import.meta.env.VITE_GDRIVE_TEMPLATE_CONTRATTO_B2B_ID || '',
-    manuale: import.meta.env.VITE_GDRIVE_TEMPLATE_MANUALE_ID || '',
-    garanzia: import.meta.env.VITE_GDRIVE_TEMPLATE_GARANZIA_ID || ''
-  }
-};
+import { getConfig } from './googleService';
 
 type DocumentType = 'contratto' | 'manuale' | 'garanzia';
 
@@ -123,18 +113,19 @@ export const getOrCreateClientFolder = async (
   piva?: string
 ): Promise<{ clientFolderId: string; firmatiFolderId: string } | null> => {
   const token = getToken();
-  if (!token || !DRIVE_CONFIG.clientiFolderId) return null;
+  const config = getConfig();
+  if (!token || !config.rootFolderId) return null;
 
   try {
     const folderName = piva ? `${nomeAzienda} - ${piva}` : nomeAzienda;
     
-    let folderId = await findFolderByName(folderName, DRIVE_CONFIG.clientiFolderId, token);
+    let folderId = await findFolderByName(folderName, config.rootFolderId, token);
     
     if (!folderId) {
-      folderId = await createFolder(folderName, DRIVE_CONFIG.clientiFolderId, token);
+      folderId = await createFolder(folderName, config.rootFolderId, token);
     }
 if (!folderId) {
-  folderId = await createFolder(folderName, DRIVE_CONFIG.clientiFolderId, token);
+  folderId = await createFolder(folderName, config.rootFolderId, token);
 }
 
 // NUOVO: Crea sottocartella Firmati
@@ -355,12 +346,13 @@ const prepareReplacements = (order: Order): Record<string, string> => {
 };
 
 const getContractTemplateId = (tipoContratto: string): string => {
+  const config = getConfig();
   if (tipoContratto.toLowerCase().includes('grenke')) {
     console.log('[INFO] Tipo contratto GRENKE - uso ACCORDO');
-    return DRIVE_CONFIG.templates.accordoGrenke;
+    return config.templateAccordoGrenkeId;
   }
   console.log('[INFO] Tipo contratto standard - uso B2B');
-  return DRIVE_CONFIG.templates.contrattoB2B;
+  return config.templateContrattoId;
 };
 
 const getContractTypeName = (tipoContratto: string): string => {
@@ -397,10 +389,10 @@ export const AndgeneratePrintDocument = async (
       const contractType = getContractTypeName(order.tipoContratto);
       documentName = `${contractType} - ${order.nomeAzienda} - ${timestamp}`;
     } else if (documentType === 'manuale') {
-      templateId = DRIVE_CONFIG.templates.manuale;
+      templateId = getConfig().templateManualeId;
       documentName = `Manuale - ${order.nomeAzienda} - ${timestamp}`;
     } else if (documentType === 'garanzia') {
-      templateId = DRIVE_CONFIG.templates.garanzia;
+      templateId = getConfig().templateGaranziaId;
       documentName = `GARANZIA_CE - ${order.nomeAzienda} - ${timestamp}`;
     } else {
       throw new Error(`Tipo documento non valido: ${documentType}`);
@@ -493,7 +485,7 @@ export const generateAllDocuments = async (
 
     console.log('[2/3] Garanzia...');
     const garanziaName = `GARANZIA_CE - ${order.nomeAzienda} - ${timestamp}`;
-    const garanziaDocId = await copyTemplate(DRIVE_CONFIG.templates.garanzia, garanziaName, clientFolderId, token);
+    const garanziaDocId = await copyTemplate(getConfig().templateGaranziaId, garanziaName, clientFolderId, token);
     if (!garanziaDocId) throw new Error('Errore copia garanzia');
     
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -512,7 +504,7 @@ export const generateAllDocuments = async (
 
     console.log('[3/3] Manuale...');
     const manualeName = `Manuale - ${order.nomeAzienda} - ${timestamp}`;
-    const manualeDocId = await copyTemplate(DRIVE_CONFIG.templates.manuale, manualeName, clientFolderId, token);
+    const manualeDocId = await copyTemplate(getConfig().templateManualeId, manualeName, clientFolderId, token);
     if (!manualeDocId) throw new Error('Errore copia manuale');
     
     await new Promise(resolve => setTimeout(resolve, 2000));

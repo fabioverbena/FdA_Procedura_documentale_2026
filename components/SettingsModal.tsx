@@ -164,9 +164,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onSave, onClose, onSeed }
                   name="rootFolderId" 
                   value={config.rootFolderId} 
                   onChange={handleChange} 
-                  disabled
-                  readOnly
-                  className="w-full border-2 border-slate-100 rounded-xl p-3 text-xs outline-none font-mono bg-slate-50 text-slate-500 cursor-not-allowed" 
+                  className="w-full border-2 border-slate-100 rounded-xl p-3 text-xs focus:border-[#00adef] outline-none font-mono" 
                   placeholder="19Xp9YhRRnLOGkolFWm0pBS2wI818KXVp"
                 />
               </div>
@@ -195,17 +193,28 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onSave, onClose, onSeed }
             <div className="grid gap-4">
               <div>
                 <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">
-                  ID Template CONTRATTO
+                  ID Template CONTRATTO B2B
                 </label>
                 <input 
                   type="text" 
                   name="templateContrattoId" 
                   value={config.templateContrattoId} 
                   onChange={handleChange} 
-                  disabled
-                  readOnly
-                  className="w-full border-2 border-slate-100 rounded-xl p-3 text-xs outline-none font-mono bg-slate-50 text-slate-500 cursor-not-allowed" 
+                  className="w-full border-2 border-slate-100 rounded-xl p-3 text-xs focus:border-[#00adef] outline-none font-mono" 
                   placeholder="1FK0xBomT9HMtKTtU1OshcXKTX5pGaTPnV8Vnp9XZYLM"
+                />
+              </div>
+              <div>
+                <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">
+                  ID Template ACCORDO GRENKE
+                </label>
+                <input 
+                  type="text" 
+                  name="templateAccordoGrenkeId" 
+                  value={config.templateAccordoGrenkeId} 
+                  onChange={handleChange} 
+                  className="w-full border-2 border-slate-100 rounded-xl p-3 text-xs focus:border-[#00adef] outline-none font-mono" 
+                  placeholder="ID Google Doc template Accordo CE Grenke"
                 />
               </div>
               <div>
@@ -217,9 +226,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onSave, onClose, onSeed }
                   name="templateManualeId" 
                   value={config.templateManualeId} 
                   onChange={handleChange} 
-                  disabled
-                  readOnly
-                  className="w-full border-2 border-slate-100 rounded-xl p-3 text-xs outline-none font-mono bg-slate-50 text-slate-500 cursor-not-allowed" 
+                  className="w-full border-2 border-slate-100 rounded-xl p-3 text-xs focus:border-[#00adef] outline-none font-mono" 
                   placeholder="1oU9hTwV7tswIRiXqGffUd02fz8jIKulPKmapKwgwFJU"
                 />
               </div>
@@ -232,9 +239,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onSave, onClose, onSeed }
                   name="templateGaranziaId" 
                   value={config.templateGaranziaId} 
                   onChange={handleChange} 
-                  disabled
-                  readOnly
-                  className="w-full border-2 border-slate-100 rounded-xl p-3 text-xs outline-none font-mono bg-slate-50 text-slate-500 cursor-not-allowed" 
+                  className="w-full border-2 border-slate-100 rounded-xl p-3 text-xs focus:border-[#00adef] outline-none font-mono" 
                   placeholder="1w8PFeu2f_yBT3sJdxz2vMIFizr8NH1Uprrk_RB0wHvA"
                 />
               </div>

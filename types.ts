@@ -26,6 +26,7 @@ export enum OrderStatus {
 export interface AppConfig {
   rootFolderId: string;
   templateContrattoId: string;
+  templateAccordoGrenkeId: string;
   templateManualeId: string;
   templateGaranziaId: string;
   spreadsheetId: string;

@@ -12,6 +12,7 @@ const getOrdersStorageKey = (spreadsheetId?: string): string => {
 const DEFAULT_CONFIG: AppConfig = {
   rootFolderId: '',
   templateContrattoId: '',
+  templateAccordoGrenkeId: '',
   templateManualeId: '',
   templateGaranziaId: '',
   spreadsheetId: import.meta.env.VITE_SPREADSHEET_ID || '',
