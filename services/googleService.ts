@@ -10,13 +10,13 @@ const getOrdersStorageKey = (spreadsheetId?: string): string => {
 };
 
 const DEFAULT_CONFIG: AppConfig = {
-  rootFolderId: '',
-  templateContrattoId: '',
-  templateAccordoGrenkeId: '',
-  templateManualeId: '',
-  templateGaranziaId: '',
+  rootFolderId: import.meta.env.VITE_ROOT_FOLDER_ID || '',
+  templateContrattoId: import.meta.env.VITE_TEMPLATE_CONTRATTO_ID || '',
+  templateAccordoGrenkeId: import.meta.env.VITE_TEMPLATE_ACCORDO_GRENKE_ID || '',
+  templateManualeId: import.meta.env.VITE_TEMPLATE_MANUALE_ID || '',
+  templateGaranziaId: import.meta.env.VITE_TEMPLATE_GARANZIA_ID || '',
   spreadsheetId: import.meta.env.VITE_SPREADSHEET_ID || '',
-  logoUrl: '',
+  logoUrl: import.meta.env.VITE_LOGO_URL || '',
   localPdfServiceUrl: 'http://127.0.0.1:7601'
 };
 
