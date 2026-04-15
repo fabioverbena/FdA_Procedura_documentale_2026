@@ -129,6 +129,8 @@ const OrderForm: React.FC<OrderFormProps> = ({
       // 8. AGGIORNA STATUS NEL DATABASE
       await onSubmit({
         ...formData,
+        clientFolderId: folders.clientFolderId,
+        firmatiFolderId: folders.firmatiFolderId,
         status: 'In attesa firma',
         workflow: {
           contrattoInviato: true,
